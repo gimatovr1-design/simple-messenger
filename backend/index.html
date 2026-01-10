@@ -17,8 +17,8 @@ body {
     background: #111a2e;
     padding: 20px;
     border-radius: 12px;
-    box-shadow: 0 0 25px #00bfff55;
-    width: 300px;
+    box-shadow: 0 0 20px #00bfff55;
+    width: 320px;
 }
 #chat { display: none; }
 input, button {
@@ -27,11 +27,12 @@ input, button {
     margin-top: 10px;
 }
 #messages {
-    height: 200px;
+    height: 220px;
     overflow-y: auto;
     border: 1px solid #222;
     padding: 5px;
     margin-bottom: 10px;
+    font-size: 14px;
 }
 </style>
 </head>
@@ -53,33 +54,53 @@ input, button {
 <script>
 let ws;
 let username;
+let connected = false;
 
 function enterChat() {
-    username = document.getElementById("username").value;
-    if (!username) return alert("Введите ник");
+    username = document.getElementById("username").value.trim();
+    if (!username) {
+        alert("Введите ник");
+        return;
+    }
 
     document.getElementById("login").style.display = "none";
     document.getElementById("chat").style.display = "block";
 
-    ws =ws = new WebSocket(
-  (location.protocol === "https:" ? "wss://" : "ws://")
-  + location.host
-  + "/ws/chat"
-);
- 
-   
+    const protocol = location.protocol === "https:" ? "wss://" : "ws://";
+    ws = new WebSocket(protocol + location.host + "/ws/chat");
+
+    ws.onopen = () => {
+        connected = true;
+        addMessage("🟢 Вы вошли в чат");
+    };
 
     ws.onmessage = (event) => {
-        const msg = document.createElement("div");
-        msg.textContent = event.data;
-        document.getElementById("messages").appendChild(msg);
+        addMessage(event.data);
+    };
+
+    ws.onclose = () => {
+        connected = false;
+        addMessage("⚠️ Соединение закрыто");
     };
 }
 
 function sendMessage() {
+    if (!connected) return;
+
     const input = document.getElementById("messageInput");
-    ws.send(username + ": " + input.value);
+    const text = input.value.trim();
+    if (!text) return;
+
+    ws.send(username + ": " + text);
     input.value = "";
+}
+
+function addMessage(text) {
+    const msg = document.createElement("div");
+    msg.textContent = text;
+    document.getElementById("messages").appendChild(msg);
+    document.getElementById("messages").scrollTop =
+        document.getElementById("messages").scrollHeight;
 }
 </script>
 
