@@ -61,7 +61,13 @@ function enterChat() {
     document.getElementById("login").style.display = "none";
     document.getElementById("chat").style.display = "block";
 
-    ws = new WebSocket(`ws://${location.host}/ws/chat`);
+    ws =ws = new WebSocket(
+  (location.protocol === "https:" ? "wss://" : "ws://")
+  + location.host
+  + "/ws/chat"
+);
+ 
+   
 
     ws.onmessage = (event) => {
         const msg = document.createElement("div");
