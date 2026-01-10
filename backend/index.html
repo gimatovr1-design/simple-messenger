@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Simple Messenger</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .chat {
+      width: 400px;
+      background: #020617;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 0 20px #38bdf8;
+    }
+    .messages {
+      height: 250px;
+      overflow-y: auto;
+      border: 1px solid #1e293b;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #020617;
+    }
+    input {
+      width: 75%;
+      padding: 8px;
+      border-radius: 5px;
+      border: none;
+    }
+    button {
+      width: 23%;
+      padding: 8px;
+      margin-left: 2%;
+      border-radius: 5px;
+      border: none;
+      background: #38bdf8;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div class="chat">
+  <h3>💬 Simple Messenger</h3>
+  <div class="messages" id="messages"></div>
+  <input id="text" placeholder="Введите сообщение..." />
+  <button onclick="sendMessage()">Отправить</button>
+</div>
+
+<script>
+  const ws = new WebSocket("wss://simple-messenger-sq98.onrender.com/ws/chat");
+  const messages = document.getElementById("messages");
+  const input = document.getElementById("text");
+
+  ws.onmessage = (event) => {
+    const div = document.createElement("div");
+    div.textContent = event.data;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  };
+
+  function sendMessage() {
+    if (input.value.trim() !== "") {
+      ws.send(input.value);
+      input.value = "";
+    }
+  }
+</script>
+
+</body>
+</html>
