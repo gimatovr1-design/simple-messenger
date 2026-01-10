@@ -4,23 +4,15 @@ from pathlib import Path
 
 app = FastAPI()
 
+HTML_FILE = Path(__file__).parent / "index.html"
+
 @app.get("/")
 async def root():
-    html = Path("index.html").read_text(encoding="utf-8")
-    return HTMLResponse(html)
-
-clients: list[WebSocket] = []
+    return HTMLResponse(HTML_FILE.read_text(encoding="utf-8"))
 
 @app.websocket("/ws/chat")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
-    clients.append(ws)
-
-    try:
-        while True:
-            data = await ws.receive_text()
-            for client in clients:
-                if client != ws:
-                    await client.send_text(data)
-    except:
-        clients.remove(ws)
+    while True:
+        data = await ws.receive_text()
+        await ws.send_text(f"echo: {data}")
