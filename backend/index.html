@@ -37,6 +37,11 @@ body {
     margin: 10px 0;
     padding: 5px;
 }
+#status {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-bottom: 5px;
+}
 </style>
 </head>
 <body>
@@ -48,6 +53,7 @@ body {
 </div>
 
 <div id="chat">
+    <div id="status">🔴 не подключено</div>
     <div><b>Пользователи:</b></div>
     <div id="users"></div>
     <hr>
@@ -60,22 +66,16 @@ body {
 let ws;
 let username = localStorage.getItem("username") || "";
 let currentUser = "";
+let reconnectTimer = null;
 
 document.getElementById("username").value = username;
 
-function enter() {
-    username = document.getElementById("username").value.trim();
-    if (!username) return alert("Введите ник");
-
-    localStorage.setItem("username", username);
-
-    document.getElementById("login").style.display = "none";
-    document.getElementById("chat").style.display = "block";
-
+function connect() {
     const proto = location.protocol === "https:" ? "wss://" : "ws://";
     ws = new WebSocket(proto + location.host + "/ws/chat");
 
     ws.onopen = () => {
+        setStatus("🟢 подключено");
         ws.send("__join__" + username);
     };
 
@@ -86,6 +86,27 @@ function enter() {
             addMessage(e.data);
         }
     };
+
+    ws.onclose = () => {
+        setStatus("🔴 соединение потеряно, переподключение...");
+        reconnectTimer = setTimeout(connect, 2000);
+    };
+
+    ws.onerror = () => {
+        ws.close();
+    };
+}
+
+function enter() {
+    username = document.getElementById("username").value.trim();
+    if (!username) return alert("Введите ник");
+
+    localStorage.setItem("username", username);
+
+    document.getElementById("login").style.display = "none";
+    document.getElementById("chat").style.display = "block";
+
+    connect();
 }
 
 function renderUsers(list) {
@@ -123,8 +144,18 @@ function addMessage(text) {
     d.textContent = text;
     document.getElementById("messages").appendChild(d);
 }
+
+function setStatus(text) {
+    document.getElementById("status").textContent = text;
+}
+
+// автологин после обновления страницы
+if (username) {
+    document.getElementById("login").style.display = "none";
+    document.getElementById("chat").style.display = "block";
+    connect();
+}
 </script>
 
 </body>
 </html>
-
