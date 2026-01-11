@@ -3,26 +3,27 @@ from fastapi import WebSocket
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: dict[str, WebSocket] = {}
+        self.active: dict[str, WebSocket] = {}
 
     async def connect(self, ws: WebSocket, username: str):
         await ws.accept()
-        self.active_connections[username] = ws
+        self.active[username] = ws
         await self.broadcast_users()
 
     def disconnect(self, username: str):
-        self.active_connections.pop(username, None)
+        self.active.pop(username, None)
 
-    async def send_private(self, sender: str, recipient: str, message: str):
-        if recipient in self.active_connections:
-            await self.active_connections[recipient].send_json({
+    async def send_private(self, sender, recipient, message):
+        if recipient in self.active:
+            await self.active[recipient].send_json({
+                "type": "message",
                 "from": sender,
                 "message": message
             })
 
     async def broadcast_users(self):
-        users = list(self.active_connections.keys())
-        for ws in self.active_connections.values():
+        users = list(self.active.keys())
+        for ws in self.active.values():
             await ws.send_json({
                 "type": "users",
                 "users": users

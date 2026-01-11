@@ -1,85 +1,77 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>Simple Messenger</title>
-    <link rel="icon" href="/favicon.ico">
-    <style>
-        body {
-            background: #0f172a;
-            color: #e5e7eb;
-            font-family: Arial, sans-serif;
-            display: flex;
-            height: 100vh;
-            margin: 0;
-        }
-        #users {
-            width: 200px;
-            border-right: 1px solid #334155;
-            padding: 10px;
-        }
-        #chat {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        #messages {
-            flex: 1;
-            padding: 10px;
-            overflow-y: auto;
-        }
-        input, button {
-            padding: 8px;
-            background: #020617;
-            color: white;
-            border: 1px solid #334155;
-        }
-        button:hover {
-            background: #2563eb;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>Simple Messenger</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+body { margin:0; display:flex; height:100vh; background:#020617; color:white; font-family:sans-serif }
+#users { width:220px; border-right:1px solid #1e293b; padding:10px }
+.user { padding:5px; cursor:pointer }
+.user:hover { background:#2563eb }
+#chat { flex:1; display:flex; flex-direction:column }
+#messages { flex:1; padding:10px; overflow-y:auto }
+input,button { background:#020617; color:white; border:1px solid #334155; padding:8px }
+</style>
 </head>
 <body>
 
 <div id="users"></div>
 
 <div id="chat">
-    <div id="messages"></div>
-    <div style="display:flex;">
-        <input id="to" placeholder="Кому">
-        <input id="message" placeholder="Сообщение" style="flex:1;">
-        <button onclick="sendMessage()">▶</button>
-    </div>
+  <div id="messages"></div>
+  <div style="display:flex">
+    <input id="to" placeholder="Кому" readonly>
+    <input id="message" placeholder="Сообщение" style="flex:1">
+    <button onclick="send()">▶</button>
+  </div>
 </div>
 
 <script>
-    const username = prompt("Ваш ник:");
-    const ws = new WebSocket(`wss://${location.host}/ws/${username}`);
+let username = localStorage.getItem("username");
+if (!username) {
+    username = prompt("Введите ник:");
+    localStorage.setItem("username", username);
+}
 
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+const ws = new WebSocket(`wss://${location.host}/ws/${username}`);
 
-        if (data.type === "users") {
-            document.getElementById("users").innerHTML =
-                "<b>Пользователи</b><br>" + data.users.join("<br>");
-        } else {
-            addMessage(`${data.from}: ${data.message}`);
-        }
-    };
+ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
 
-    function sendMessage() {
-        ws.send(JSON.stringify({
-            to: document.getElementById("to").value,
-            message: document.getElementById("message").value
-        }));
-        document.getElementById("message").value = "";
+    if (data.type === "users") {
+        const usersDiv = document.getElementById("users");
+        usersDiv.innerHTML = "<b>Пользователи</b><br>";
+        data.users.forEach(u => {
+            if (u !== username) {
+                const d = document.createElement("div");
+                d.textContent = u;
+                d.className = "user";
+                d.onclick = () => document.getElementById("to").value = u;
+                usersDiv.appendChild(d);
+            }
+        });
     }
 
-    function addMessage(text) {
-        const div = document.createElement("div");
-        div.textContent = text;
-        document.getElementById("messages").appendChild(div);
+    if (data.type === "message") {
+        add(`${data.from}: ${data.message}`);
     }
+};
+
+function send() {
+    const to = document.getElementById("to").value;
+    const msg = document.getElementById("message").value;
+    if (!to || !msg) return;
+    ws.send(JSON.stringify({ to, message: msg }));
+    add(`Я → ${to}: ${msg}`);
+    document.getElementById("message").value = "";
+}
+
+function add(text) {
+    const d = document.createElement("div");
+    d.textContent = text;
+    document.getElementById("messages").appendChild(d);
+}
 </script>
 
 </body>

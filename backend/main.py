@@ -6,12 +6,11 @@ from ws_manager import ConnectionManager
 app = FastAPI()
 manager = ConnectionManager()
 
-# Статика (index.html + favicon.ico)
 app.mount("/static", StaticFiles(directory="."), name="static")
 
 
 @app.get("/")
-async def get_index():
+async def index():
     return FileResponse("index.html")
 
 
@@ -21,15 +20,12 @@ async def favicon():
 
 
 @app.websocket("/ws/{username}")
-async def websocket_endpoint(ws: WebSocket, username: str):
+async def websocket(ws: WebSocket, username: str):
     await manager.connect(ws, username)
     try:
         while True:
             data = await ws.receive_json()
-            await manager.send_private(
-                sender=username,
-                recipient=data["to"],
-                message=data["message"]
-            )
+            await manager.send_private(username, data["to"], data["message"])
     except WebSocketDisconnect:
         manager.disconnect(username)
+        await manager.broadcast_users()
