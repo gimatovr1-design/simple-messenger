@@ -10,214 +10,159 @@
 body {
     margin: 0;
     height: 100vh;
-    background: radial-gradient(circle at top, #020617, #000);
+    background: radial-gradient(circle at top, #1b1f3b, #0b0d1a);
+    font-family: 'Segoe UI', sans-serif;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    color: #e5e7eb;
+    color: white;
 }
 
-.chat {
-    width: 420px;
-    height: 600px;
-    background: rgba(15,23,42,.9);
-    backdrop-filter: blur(16px);
-    border-radius: 22px;
-    box-shadow: 0 25px 70px rgba(0,0,0,.6);
+/* ===== контейнер чата ===== */
+#chat {
+    width: 380px;
+    height: 560px;
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(14px);
+    border-radius: 18px;
+    padding: 14px;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    box-shadow: 0 0 40px rgba(0,0,0,0.6);
 }
 
-.header {
-    padding: 14px 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid rgba(255,255,255,.08);
-}
-
-.title {
-    font-weight: 600;
-    font-size: 15px;
-}
-
-.status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    opacity: .9;
-}
-
-#statusDot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: #ef4444;
-}
-
-#statusDot.online { background: #22c55e; }
-
-button {
-    background: rgba(255,255,255,.1);
-    border: none;
-    color: #e5e7eb;
-    padding: 6px 12px;
-    border-radius: 10px;
-    cursor: pointer;
-}
-
-button:hover { background: rgba(255,255,255,.18); }
-
+/* ===== сообщения ===== */
 #messages {
     flex: 1;
-    padding: 14px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    padding-right: 4px;
 }
 
 .msg {
     max-width: 75%;
-    padding: 9px 13px;
-    border-radius: 14px;
-    font-size: 14px;
-    line-height: 1.3;
-    animation: fade .15s ease;
+    padding: 8px 12px;
+    border-radius: 12px;
+    animation: fade 0.2s ease;
+    word-wrap: break-word;
 }
 
-.msg.other {
-    background: rgba(255,255,255,.1);
-    align-self: flex-start;
-}
-
+/* свои сообщения */
 .msg.me {
-    background: linear-gradient(135deg, #2563eb, #3b82f6);
     align-self: flex-end;
+    background: linear-gradient(135deg, #4a6cff, #6c8bff);
+    text-align: right;
 }
 
+/* чужие сообщения */
+.msg.other {
+    align-self: flex-start;
+    background: rgba(255,255,255,0.15);
+}
+
+/* анимация */
 @keyframes fade {
-    from { opacity: 0; transform: translateY(4px); }
+    from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
-.input {
-    padding: 12px;
+/* ===== панели ===== */
+.row {
     display: flex;
-    gap: 8px;
-    border-top: 1px solid rgba(255,255,255,.08);
+    gap: 6px;
+    margin-top: 6px;
 }
 
 input {
     flex: 1;
-    background: rgba(255,255,255,.08);
+    background: rgba(0,0,0,0.35);
     border: none;
+    border-radius: 10px;
+    padding: 10px;
+    color: white;
     outline: none;
-    padding: 10px 14px;
-    border-radius: 14px;
-    color: #e5e7eb;
 }
 
-input::placeholder { color: #94a3b8; }
+input::placeholder {
+    color: #aaa;
+}
+
+button {
+    background: linear-gradient(135deg, #4a6cff, #6c8bff);
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: white;
+    cursor: pointer;
+}
 </style>
 </head>
 
 <body>
 
-<div class="chat">
+<div id="chat">
 
-    <div class="header">
-        <div>
-            <div class="title">Simple Messenger</div>
-            <div class="status">
-                <div id="statusDot"></div>
-                <div id="statusText">Офлайн</div>
-            </div>
-        </div>
-        <button id="changeNick">Ник</button>
+    <!-- ник -->
+    <div class="row">
+        <input id="nick" placeholder="Введите ник">
+        <button type="button" onclick="setNick()">OK</button>
     </div>
 
+    <!-- сообщения -->
     <div id="messages"></div>
 
-    <div class="input">
-        <input id="messageInput" placeholder="Напиши сообщение..." autocomplete="off">
-        <button id="sendBtn">➤</button>
+    <!-- ввод -->
+    <div class="row">
+        <input id="text" placeholder="Сообщение"
+               onkeydown="if(event.key==='Enter') sendMessage()">
+        <button type="button" onclick="sendMessage()">➤</button>
     </div>
 
 </div>
 
 <script>
-let nickname = localStorage.getItem("nickname");
+const protocol = location.protocol === "https:" ? "wss" : "ws";
+const ws = new WebSocket(`${protocol}://${location.host}/ws`);
 
-if (!nickname || nickname === "null") {
-    nickname = prompt("Введите ник:");
-    if (!nickname || !nickname.trim()) {
-        nickname = "Guest" + Math.floor(Math.random() * 1000);
+let myNick = "";
+
+// получение сообщений
+ws.onmessage = (e) => {
+    const text = e.data;
+    const msg = document.createElement("div");
+    msg.classList.add("msg");
+
+    if (myNick && text.startsWith(myNick + ":")) {
+        msg.classList.add("me");
+        msg.textContent = text.replace(myNick + ":", "").trim();
+    } else {
+        msg.classList.add("other");
+        msg.textContent = text;
     }
-    localStorage.setItem("nickname", nickname);
+
+    document.getElementById("messages").appendChild(msg);
+    msg.scrollIntoView({ behavior: "smooth" });
+};
+
+// установка ника
+function setNick() {
+    const nick = document.getElementById("nick").value.trim();
+    if (!nick) return;
+    myNick = nick;
+    ws.send("/nick " + nick);
 }
 
-const messages = document.getElementById("messages");
-const input = document.getElementById("messageInput");
-const sendBtn = document.getElementById("sendBtn");
-const statusDot = document.getElementById("statusDot");
-const statusText = document.getElementById("statusText");
-
-let ws;
-
-function connect() {
-    const protocol = location.protocol === "https:" ? "wss" : "ws";
-    ws = new WebSocket(`${protocol}://${location.host}/ws`);
-
-    ws.onopen = () => {
-        ws.send(nickname);
-        statusDot.classList.add("online");
-        statusText.textContent = "В сети";
-    };
-
-    ws.onmessage = (e) => {
-        const div = document.createElement("div");
-        div.className = e.data.startsWith(nickname + ":")
-            ? "msg me"
-            : "msg other";
-        div.textContent = e.data;
-        messages.appendChild(div);
-        messages.scrollTop = messages.scrollHeight;
-    };
-
-    ws.onclose = () => {
-        statusDot.classList.remove("online");
-        statusText.textContent = "Офлайн";
-    };
-}
-
-connect();
-
+// отправка сообщения
 function sendMessage() {
-    if (!input.value.trim()) return;
-    ws.send(nickname + ": " + input.value);
+    const input = document.getElementById("text");
+    const text = input.value.trim();
+    if (!text) return;
+    ws.send(text);
     input.value = "";
 }
-
-sendBtn.onclick = sendMessage;
-
-input.addEventListener("keydown", e => {
-    if (e.key === "Enter") sendMessage();
-});
-
-document.getElementById("changeNick").onclick = () => {
-    const newNick = prompt("Новый ник:");
-    if (!newNick || !newNick.trim()) return;
-    localStorage.setItem("nickname", newNick);
-    nickname = newNick;
-    ws.close();
-    connect();
-};
 </script>
 
 </body>
 </html>
-
