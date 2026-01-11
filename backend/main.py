@@ -36,7 +36,14 @@ manager = ConnectionManager()
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await manager.connect(ws)
-    await manager.broadcast(f"{manager.active[ws]} подключился")
+await ws.send_text(
+    "👋 Добро пожаловать в чат!\n\n"
+    "💬 Пиши сообщения — их увидят все\n"
+    "👤 Сменить ник: /nick ИМЯ\n\n"
+    "Приятного общения ✨"
+)
+
+   await manager.broadcast(f"{manager.active[ws]} подключился")
 
     try:
         while True:
