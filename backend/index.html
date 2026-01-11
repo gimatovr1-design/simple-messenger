@@ -28,15 +28,6 @@ input, button {
     padding: 8px;
     margin-top: 5px;
 }
-#clearBtn {
-    display: none;
-    background: #b00020;
-    color: white;
-}
-.system {
-    color: #aaa;
-    font-style: italic;
-}
 </style>
 </head>
 <body>
@@ -44,13 +35,11 @@ input, button {
 <div id="chat">
     <div id="messages"></div>
 
-    <input id="nick" placeholder="Ник (руслан для доступа)" />
+    <input id="nick" placeholder="Ник" />
     <button onclick="setNick()">Сменить ник</button>
 
     <input id="text" placeholder="Сообщение" />
     <button onclick="sendMessage()">Отправить</button>
-
-    <button id="clearBtn">🧹 Очистить чат</button>
 </div>
 
 <script>
@@ -58,33 +47,21 @@ const ws = new WebSocket(`ws://${location.host}/ws`);
 let myNick = "Гость";
 
 const messagesDiv = document.getElementById("messages");
-const clearBtn = document.getElementById("clearBtn");
 
 ws.onmessage = (e) => {
     const data = JSON.parse(e.data);
     const div = document.createElement("div");
-
-    if (data.type === "system") {
-        div.className = "system";
-        div.textContent = data.message;
-    } else {
-        div.textContent = `${data.nick}: ${data.text}`;
-    }
-
+    div.textContent = `${data.nick}: ${data.text}`;
     messagesDiv.appendChild(div);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 };
 
 function setNick() {
     myNick = document.getElementById("nick").value || "Гость";
-
     ws.send(JSON.stringify({
         type: "nick",
         nick: myNick
     }));
-
-    // кнопка ТОЛЬКО для руслан
-    clearBtn.style.display = (myNick === "руслан") ? "block" : "none";
 }
 
 function sendMessage() {
@@ -98,14 +75,6 @@ function sendMessage() {
 
     document.getElementById("text").value = "";
 }
-
-clearBtn.onclick = () => {
-    if (!confirm("Очистить чат для всех?")) return;
-
-    ws.send(JSON.stringify({
-        type: "clear_chat"
-    }));
-};
 </script>
 
 </body>

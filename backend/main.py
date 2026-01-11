@@ -5,7 +5,6 @@ from pathlib import Path
 
 app = FastAPI()
 
-ADMIN_NICK = "руслан"
 MESSAGES_FILE = Path("messages.json")
 
 
@@ -51,16 +50,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 manager.active[websocket] = nickname
                 continue
 
-            # очистка чата (ТОЛЬКО руслан)
-            if data["type"] == "clear_chat":
-                if nickname == ADMIN_NICK:
-                    MESSAGES_FILE.write_text("[]", encoding="utf-8")
-                    await manager.broadcast(json.dumps({
-                        "type": "system",
-                        "message": "🧹 Чат очищен администратором"
-                    }, ensure_ascii=False))
-                continue
-
             # обычное сообщение
             if data["type"] == "message":
                 msg = {
@@ -69,14 +58,19 @@ async def websocket_endpoint(websocket: WebSocket):
                     "text": data["text"]
                 }
 
-                messages = json.loads(MESSAGES_FILE.read_text(encoding="utf-8"))
+                messages = json.loads(
+                    MESSAGES_FILE.read_text(encoding="utf-8")
+                )
                 messages.append(msg)
+
                 MESSAGES_FILE.write_text(
                     json.dumps(messages, ensure_ascii=False, indent=2),
                     encoding="utf-8"
                 )
 
-                await manager.broadcast(json.dumps(msg, ensure_ascii=False))
+                await manager.broadcast(
+                    json.dumps(msg, ensure_ascii=False)
+                )
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
