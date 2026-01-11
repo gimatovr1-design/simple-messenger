@@ -10,24 +10,43 @@
 body {
     margin: 0;
     height: 100vh;
-    background:
-        radial-gradient(circle at 20% 10%, #1e293b, transparent 40%),
-        radial-gradient(circle at 80% 90%, #020617, transparent 40%),
-        linear-gradient(180deg, #020617, #000);
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    background: linear-gradient(120deg, #020617, #020617);
+    overflow: hidden;
     font-family: Inter, system-ui, sans-serif;
     color: #e5e7eb;
 }
 
+/* 🌌 ЖИВОЙ ФОН */
+body::before {
+    content: "";
+    position: fixed;
+    inset: -50%;
+    background:
+        radial-gradient(circle at 20% 20%, #2563eb55, transparent 40%),
+        radial-gradient(circle at 80% 70%, #7c3aed55, transparent 45%),
+        radial-gradient(circle at 50% 50%, #22c55e33, transparent 50%);
+    animation: bgmove 18s linear infinite;
+    z-index: -1;
+}
+
+@keyframes bgmove {
+    0%   { transform: translate(0,0) rotate(0deg); }
+    50%  { transform: translate(10%, -10%) rotate(180deg); }
+    100% { transform: translate(0,0) rotate(360deg); }
+}
+
+/* ---------- CHAT ---------- */
 .chat {
-    width: 420px;
-    height: 640px;
-    background: rgba(15,23,42,.85);
-    backdrop-filter: blur(22px);
-    border-radius: 26px;
-    box-shadow: 0 30px 90px rgba(0,0,0,.7);
+    width: 440px;
+    height: 700px;
+    margin: auto;
+    margin-top: calc(50vh - 350px);
+    background: rgba(10,15,30,.82);
+    backdrop-filter: blur(30px);
+    border-radius: 32px;
+    box-shadow:
+        0 40px 140px rgba(0,0,0,.9),
+        inset 0 0 0 1px rgba(255,255,255,.06);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -35,16 +54,18 @@ body {
 
 /* ---------- HEADER ---------- */
 .header {
-    padding: 16px 18px;
+    padding: 20px 22px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid rgba(255,255,255,.08);
+    background: linear-gradient(180deg, rgba(255,255,255,.06), transparent);
+    border-bottom: 1px solid rgba(255,255,255,.06);
 }
 
 .title {
+    font-size: 17px;
     font-weight: 600;
-    font-size: 16px;
+    letter-spacing: .3px;
 }
 
 .status {
@@ -52,7 +73,6 @@ body {
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    opacity: .9;
 }
 
 #statusDot {
@@ -60,198 +80,67 @@ body {
     height: 9px;
     border-radius: 50%;
     background: #ef4444;
+    box-shadow: 0 0 10px rgba(239,68,68,.9);
 }
 
-#statusDot.online { background: #22c55e; }
+#statusDot.online {
+    background: #22c55e;
+    box-shadow: 0 0 12px rgba(34,197,94,1);
+}
 
 .header button {
     background: rgba(255,255,255,.08);
     border: none;
     color: #e5e7eb;
-    padding: 6px 12px;
-    border-radius: 12px;
+    padding: 7px 16px;
+    border-radius: 16px;
     cursor: pointer;
-    transition: background .2s;
+    transition: .2s;
 }
-
 .header button:hover {
-    background: rgba(255,255,255,.16);
+    background: rgba(255,255,255,.18);
+    transform: scale(1.06);
 }
 
 /* ---------- MESSAGES ---------- */
 #messages {
     flex: 1;
-    padding: 18px;
+    padding: 22px;
     overflow-y: auto;
+    scroll-behavior: smooth;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 14px;
 }
 
-.msg {
-    max-width: 75%;
-    padding: 10px 14px;
-    border-radius: 18px;
-    font-size: 14px;
-    line-height: 1.35;
-    animation: pop .2s ease;
-    word-wrap: break-word;
+.message {
+    max-width: 82%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    animation: msg .25s ease;
 }
 
-.msg.other {
-    background: rgba(255,255,255,.12);
-    align-self: flex-start;
-    border-bottom-left-radius: 6px;
-}
-
-.msg.me {
-    background: linear-gradient(135deg, #2563eb, #3b82f6);
-    align-self: flex-end;
-    border-bottom-right-radius: 6px;
-}
-
-@keyframes pop {
-    from { opacity: 0; transform: translateY(6px) scale(.98); }
+@keyframes msg {
+    from { opacity: 0; transform: translateY(10px) scale(.97); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ---------- INPUT ---------- */
-.input {
-    padding: 14px;
-    display: flex;
-    gap: 10px;
-    border-top: 1px solid rgba(255,255,255,.08);
-    background: rgba(2,6,23,.6);
+.message.me { align-self: flex-end; }
+
+.meta {
+    font-size: 11px;
+    opacity: .55;
+    padding: 0 6px;
 }
 
-input {
-    flex: 1;
-    background: rgba(255,255,255,.1);
-    border: none;
-    outline: none;
-    padding: 12px 16px;
-    border-radius: 18px;
-    color: #e5e7eb;
+.bubble {
+    padding: 14px 18px;
+    border-radius: 22px;
     font-size: 14px;
+    line-height: 1.4;
 }
 
-input::placeholder {
-    color: #94a3b8;
-}
-
-#sendBtn {
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    border: none;
-    cursor: pointer;
-    background: linear-gradient(135deg, #2563eb, #3b82f6);
-    color: white;
-    font-size: 18px;
-    transition: transform .15s, box-shadow .15s;
-}
-
-#sendBtn:hover {
-    transform: scale(1.08);
-    box-shadow: 0 0 18px rgba(59,130,246,.6);
-}
-</style>
-</head>
-
-<body>
-
-<div class="chat">
-
-    <div class="header">
-        <div>
-            <div class="title">Simple Messenger</div>
-            <div class="status">
-                <div id="statusDot"></div>
-                <div id="statusText">Офлайн</div>
-            </div>
-        </div>
-        <button id="changeNick">Ник</button>
-    </div>
-
-    <div id="messages"></div>
-
-    <div class="input">
-        <input id="messageInput" placeholder="Сообщение..." autocomplete="off">
-        <button id="sendBtn">➤</button>
-    </div>
-
-</div>
-
-<script>
-let nickname = localStorage.getItem("nickname");
-
-if (!nickname || nickname === "null") {
-    nickname = prompt("Введите ник:");
-    if (!nickname || !nickname.trim()) {
-        nickname = "Guest" + Math.floor(Math.random() * 1000);
-    }
-    localStorage.setItem("nickname", nickname);
-}
-
-const messages = document.getElementById("messages");
-const input = document.getElementById("messageInput");
-const sendBtn = document.getElementById("sendBtn");
-const statusDot = document.getElementById("statusDot");
-const statusText = document.getElementById("statusText");
-
-input.focus();
-
-let ws;
-
-function connect() {
-    const protocol = location.protocol === "https:" ? "wss" : "ws";
-    ws = new WebSocket(`${protocol}://${location.host}/ws`);
-
-    ws.onopen = () => {
-        ws.send(nickname);
-        statusDot.classList.add("online");
-        statusText.textContent = "В сети";
-    };
-
-    ws.onmessage = (e) => {
-        const div = document.createElement("div");
-        div.className = e.data.startsWith(nickname + ":")
-            ? "msg me"
-            : "msg other";
-        div.textContent = e.data;
-        messages.appendChild(div);
-        messages.scrollTop = messages.scrollHeight;
-    };
-
-    ws.onclose = () => {
-        statusDot.classList.remove("online");
-        statusText.textContent = "Офлайн";
-    };
-}
-
-connect();
-
-function sendMessage() {
-    if (!input.value.trim()) return;
-    ws.send(nickname + ": " + input.value);
-    input.value = "";
-}
-
-sendBtn.onclick = sendMessage;
-
-input.addEventListener("keydown", e => {
-    if (e.key === "Enter") sendMessage();
-});
-
-document.getElementById("changeNick").onclick = () => {
-    const newNick = prompt("Новый ник:");
-    if (!newNick || !newNick.trim()) return;
-    localStorage.setItem("nickname", newNick);
-    nickname = newNick;
-    ws.close();
-    connect();
-};
-</script>
-
-</body>
-</html>
+.other .bubble {
+    background: rgba(255,255,255,.14);
+    border-bot
