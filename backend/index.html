@@ -1,51 +1,64 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Simple Messenger</title>
-<style>
-body {
-    background: #0b1220;
-    color: white;
-    font-family: Arial, sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-}
-#login, #chat {
-    background: #111a2e;
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 0 20px #00bfff55;
-    width: 320px;
-}
-#chat { display: none; }
-input, button {
-    width: 100%;
-    padding: 10px;
-    margin-top: 10px;
-}
-#messages {
-    height: 220px;
-    overflow-y: auto;
-    border: 1px solid #222;
-    padding: 5px;
-    margin-bottom: 10px;
-    font-size: 14px;
-}
-</style>
+    <meta charset="UTF-8">
+    <title>Simple Messenger</title>
+    <style>
+        body {
+            background: #0b1220;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #login, #chat {
+            background: #111a2e;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 0 20px #00bfff55;
+            width: 320px;
+        }
+
+        #chat {
+            display: none;
+        }
+
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+        }
+
+        button {
+            background: #00bfff;
+            cursor: pointer;
+        }
+
+        #messages {
+            height: 220px;
+            overflow-y: auto;
+            border: 1px solid #222;
+            padding: 5px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+    </style>
 </head>
 <body>
 
 <div id="login">
-    <h3>👤 Вход в чат</h3>
-    <input id="username" placeholder="Ваш ник">
+    <h3>Вход в чат</h3>
+    <input id="username" placeholder="Введите ник">
     <button onclick="enterChat()">Войти</button>
 </div>
 
 <div id="chat">
-    <h3>💬 Simple Messenger</h3>
     <div id="messages"></div>
     <input id="messageInput" placeholder="Сообщение">
     <button onclick="sendMessage()">Отправить</button>
@@ -53,8 +66,15 @@ input, button {
 
 <script>
 let ws;
-let username;
 let connected = false;
+let username = localStorage.getItem("username") || "";
+
+// подставляем ник при загрузке
+window.onload = () => {
+    if (username) {
+        document.getElementById("username").value = username;
+    }
+};
 
 function enterChat() {
     username = document.getElementById("username").value.trim();
@@ -62,6 +82,9 @@ function enterChat() {
         alert("Введите ник");
         return;
     }
+
+    // сохраняем ник
+    localStorage.setItem("username", username);
 
     document.getElementById("login").style.display = "none";
     document.getElementById("chat").style.display = "block";
@@ -71,7 +94,7 @@ function enterChat() {
 
     ws.onopen = () => {
         connected = true;
-        addMessage("🟢 Вы вошли в чат");
+        addMessage("🟢 Вы вошли в чат как " + username);
     };
 
     ws.onmessage = (event) => {
@@ -80,7 +103,7 @@ function enterChat() {
 
     ws.onclose = () => {
         connected = false;
-        addMessage("⚠️ Соединение закрыто");
+        addMessage("🔴 Соединение закрыто");
     };
 }
 
@@ -106,3 +129,4 @@ function addMessage(text) {
 
 </body>
 </html>
+
