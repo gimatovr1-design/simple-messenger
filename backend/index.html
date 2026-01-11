@@ -66,14 +66,20 @@ function connect(){
         ws.send("__join__"+username);
     };
 
-    ws.onmessage = e=>{
-        if(e.data.startsWith("__users__")){
-            renderUsers(e.data.replace("__users__","").split(","));
-        }else{
-            let [from,msg] = e.data.split(": ",2);
-            addMessage(from+": "+decrypt(msg, from));
-        }
-    };
+    ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+
+    if (data.type === "users") {
+        renderUsers(data.users);
+    }
+
+    if (data.type === "message") {
+        const decrypted = decrypt(data.text, data.from);
+        addMessage(data.from + ": " + decrypted);
+    }
+};
+
+    
 
     ws.onclose = ()=>{
         setStatus("🔴 reconnecting...");
