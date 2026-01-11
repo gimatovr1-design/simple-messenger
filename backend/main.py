@@ -1,7 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
-import json
 from pathlib import Path
+import json
 
 app = FastAPI()
 
@@ -15,16 +15,26 @@ async def root():
 
 class ConnectionManager:
     def __init__(self):
-        self.active = {}
+        self.active = []
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
+        self.active.append(websocket)
+
+        # отправляем сохранённую историю
+        if MESSAGES_FILE.exists():
+            messages = json.loads(MESSAGES_FILE.read_text(encoding="utf-8"))
+            for msg in messages:
+                await websocket.send_text(
+                    json.dumps(msg, ensure_ascii=False)
+                )
 
     def disconnect(self, websocket: WebSocket):
-        self.active.pop(websocket, None)
+        if websocket in self.active:
+            self.active.remove(websocket)
 
     async def broadcast(self, message: str):
-        for ws in list(self.active.keys()):
+        for ws in list(self.active):
             try:
                 await ws.send_text(message)
             except:
@@ -41,23 +51,21 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            text = await websocket.receive_text()
-            data = json.loads(text)
+            data = json.loads(await websocket.receive_text())
 
             # смена ника
             if data["type"] == "nick":
                 nickname = data["nick"]
-                manager.active[websocket] = nickname
                 continue
 
-            # обычное сообщение
+            # сообщение
             if data["type"] == "message":
                 msg = {
-                    "type": "message",
                     "nick": nickname,
                     "text": data["text"]
                 }
 
+                # сохраняем
                 messages = json.loads(
                     MESSAGES_FILE.read_text(encoding="utf-8")
                 )

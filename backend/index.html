@@ -6,27 +6,45 @@
 
 <style>
 body {
-    background: #111;
-    color: #fff;
-    font-family: Arial, sans-serif;
+    margin: 0;
+    background: #0f0f0f;
+    height: 100vh;
     display: flex;
     justify-content: center;
-    margin-top: 40px;
+    align-items: center;
+    font-family: Arial, sans-serif;
+    color: #fff;
 }
+
 #chat {
-    width: 360px;
-}
-#messages {
-    height: 300px;
-    border: 1px solid #333;
+    width: 300px;
+    background: #141414;
+    border-radius: 10px;
     padding: 10px;
-    overflow-y: auto;
-    margin-bottom: 10px;
 }
+
+#messages {
+    height: 180px;
+    overflow-y: auto;
+    border: 1px solid #333;
+    padding: 5px;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
 input, button {
     width: 100%;
-    padding: 8px;
     margin-top: 5px;
+    padding: 6px;
+    font-size: 14px;
+    border: none;
+    border-radius: 5px;
+}
+
+button {
+    background: #2a2a2a;
+    color: #fff;
+    cursor: pointer;
 }
 </style>
 </head>
@@ -35,29 +53,29 @@ input, button {
 <div id="chat">
     <div id="messages"></div>
 
-    <input id="nick" placeholder="Ник" />
-    <button onclick="setNick()">Сменить ник</button>
+    <input id="nick" placeholder="Ник">
+    <button onclick="setNick()">OK</button>
 
-    <input id="text" placeholder="Сообщение" />
-    <button onclick="sendMessage()">Отправить</button>
+    <input id="text" placeholder="Сообщение">
+    <button onclick="sendMessage()">➤</button>
 </div>
 
 <script>
 const ws = new WebSocket(`ws://${location.host}/ws`);
 let myNick = "Гость";
 
-const messagesDiv = document.getElementById("messages");
+const messages = document.getElementById("messages");
 
 ws.onmessage = (e) => {
     const data = JSON.parse(e.data);
     const div = document.createElement("div");
     div.textContent = `${data.nick}: ${data.text}`;
-    messagesDiv.appendChild(div);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
 };
 
 function setNick() {
-    myNick = document.getElementById("nick").value || "Гость";
+    myNick = nick.value || "Гость";
     ws.send(JSON.stringify({
         type: "nick",
         nick: myNick
@@ -65,15 +83,13 @@ function setNick() {
 }
 
 function sendMessage() {
-    const text = document.getElementById("text").value;
-    if (!text) return;
+    if (!text.value) return;
 
     ws.send(JSON.stringify({
         type: "message",
-        text: text
+        text: text.value
     }));
-
-    document.getElementById("text").value = "";
+    text.value = "";
 }
 </script>
 
