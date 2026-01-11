@@ -17,36 +17,37 @@ body {
   margin:0;
 }
 
-/* Контейнер чата */
 #chat {
   width:320px;
   background:#020617;
   border:1px solid #1e293b;
-  border-radius:12px;
-  box-shadow:0 0 20px rgba(0,0,0,.6);
+  border-radius:14px;
+  box-shadow:0 0 25px rgba(0,0,0,.6);
   overflow:hidden;
 }
 
-/* Шапка */
 #header {
   display:flex;
   align-items:center;
   gap:8px;
   padding:10px;
   border-bottom:1px solid #1e293b;
-  background:#020617;
 }
 
-/* Зеленая точка */
 #status {
   width:10px;
   height:10px;
-  background:#22c55e;
   border-radius:50%;
+  background:#ef4444;
+  box-shadow:0 0 6px #ef4444;
+  transition:.3s;
+}
+
+#status.online {
+  background:#22c55e;
   box-shadow:0 0 6px #22c55e;
 }
 
-/* Сообщения */
 #messages {
   height:200px;
   overflow-y:auto;
@@ -56,17 +57,14 @@ body {
 
 .msg {
   margin-bottom:6px;
-  word-wrap:break-word;
 }
 
-/* Поле ввода */
 #inputBox {
-  display:flex;
   border-top:1px solid #1e293b;
 }
 
 #msg {
-  flex:1;
+  width:100%;
   padding:8px;
   background:#020617;
   color:white;
@@ -80,7 +78,7 @@ body {
 <div id="chat">
   <div id="header">
     <div id="status"></div>
-    <div>В сети</div>
+    <div id="statusText">Офлайн</div>
   </div>
 
   <div id="messages"></div>
@@ -95,21 +93,36 @@ const nickname = prompt("Введите ник:");
 const protocol = location.protocol === "https:" ? "wss" : "ws";
 const ws = new WebSocket(`${protocol}://${location.host}/ws`);
 
+const statusDot = document.getElementById("status");
+const statusText = document.getElementById("statusText");
+const messages = document.getElementById("messages");
+
 ws.onopen = () => {
     ws.send(nickname);
+    statusDot.classList.add("online");
+    statusText.textContent = "В сети";
+};
+
+ws.onclose = () => {
+    statusDot.classList.remove("online");
+    statusText.textContent = "Офлайн";
+};
+
+ws.onerror = () => {
+    statusDot.classList.remove("online");
+    statusText.textContent = "Офлайн";
 };
 
 ws.onmessage = (e) => {
-    const div = document.createElement("div");
-    div.className = "msg";
-    div.textContent = e.data;
-    const box = document.getElementById("messages");
-    box.appendChild(div);
-    box.scrollTop = box.scrollHeight;
+    const d = document.createElement("div");
+    d.className = "msg";
+    d.textContent = e.data;
+    messages.appendChild(d);
+    messages.scrollTop = messages.scrollHeight;
 };
 
 document.getElementById("msg").addEventListener("keydown", e => {
-    if (e.key === "Enter" && e.target.value.trim()) {
+    if (e.key === "Enter" && e.target.value.trim() && ws.readyState === 1) {
         ws.send(e.target.value);
         e.target.value = "";
     }
