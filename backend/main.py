@@ -17,7 +17,7 @@ def load_messages():
         return json.load(f)
 
 
-def save_message(message: str):
+def save_message(message: dict):
     messages = load_messages()
     messages.append(message)
     with open(MESSAGES_FILE, "w", encoding="utf-8") as f:
@@ -37,19 +37,26 @@ class ConnectionManager:
         await websocket.accept()
         self.active[websocket] = ""
 
-        # 🔥 отправляем историю при подключении
+        # история
         for msg in load_messages():
-            await websocket.send_text(msg)
+            await websocket.send_json({
+                "type": "message",
+                "nick": msg["nick"],
+                "text": msg["text"]
+            })
 
     def disconnect(self, websocket: WebSocket):
-        if websocket in self.active:
-            del self.active[websocket]
+        self.active.pop(websocket, None)
 
-    async def broadcast(self, message: str):
-        save_message(message)  # 💾 сохраняем сообщение
+    async def broadcast(self, message: dict):
+        save_message(message)
         for ws in list(self.active):
             try:
-                await ws.send_text(message)
+                await ws.send_json({
+                    "type": "message",
+                    "nick": message["nick"],
+                    "text": message["text"]
+                })
             except:
                 self.disconnect(ws)
 
@@ -69,23 +76,35 @@ async def websocket_endpoint(websocket: WebSocket):
             if not data:
                 continue
 
+            # установка ника
             if data.startswith("/nick "):
                 nick = data.replace("/nick ", "").strip()
                 if not nick:
-                    await websocket.send_text("❌ Ник не может быть пустым")
+                    await websocket.send_json({
+                        "type": "system",
+                        "text": "❌ Ник не может быть пустым"
+                    })
                     continue
 
                 manager.active[websocket] = nick
-                await websocket.send_text(f"✅ Ник установлен: {nick}")
+                await websocket.send_json({
+                    "type": "system",
+                    "text": f"✅ Ник установлен: {nick}"
+                })
                 continue
 
-            nick = manager.active.get(websocket, "")
+            nick = manager.active.get(websocket)
             if not nick:
-                await websocket.send_text("❌ Сначала укажи ник")
+                await websocket.send_json({
+                    "type": "system",
+                    "text": "❌ Сначала укажи ник"
+                })
                 continue
 
-            message = f"{nick}: {data}"
-            await manager.broadcast(message)
+            await manager.broadcast({
+                "nick": nick,
+                "text": data
+            })
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
