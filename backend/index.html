@@ -40,6 +40,12 @@ header {
     word-break: break-word;
 }
 
+.time {
+    color: #777;
+    font-size: 11px;
+    margin-right: 6px;
+}
+
 .system {
     color: #888;
     font-style: italic;
@@ -65,21 +71,32 @@ button {
     font-size: 16px;
     cursor: pointer;
 }
+
+#notify {
+    display: none;
+    background: #ff4444;
+    color: #000;
+    padding: 6px;
+    text-align: center;
+    font-size: 14px;
+}
 </style>
 </head>
 
 <body>
 
 <header>
-    <div>🟢 Simple Messenger</div>
+    <div>💬 Simple Messenger</div>
     <div id="status">🔴 offline</div>
 </header>
+
+<div id="notify">⚠️ Соединение потеряно</div>
 
 <div id="messages"></div>
 
 <footer>
     <input id="input" type="text" placeholder="Введите сообщение..." disabled>
-    <button onclick="sendMessage()" disabled id="sendBtn">➤</button>
+    <button id="sendBtn" disabled>➤</button>
 </footer>
 
 <script>
@@ -90,11 +107,31 @@ const statusEl = document.getElementById("status");
 const input = document.getElementById("input");
 const sendBtn = document.getElementById("sendBtn");
 const messages = document.getElementById("messages");
+const notify = document.getElementById("notify");
+
+function now() {
+    const d = new Date();
+    return d.toLocaleTimeString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+    });
+}
 
 function addMessage(text, cls = "") {
     const div = document.createElement("div");
     div.className = "message " + cls;
-    div.textContent = text;
+
+    const time = document.createElement("span");
+    time.className = "time";
+    time.textContent = now();
+
+    const msg = document.createElement("span");
+    msg.textContent = text;
+
+    div.appendChild(time);
+    div.appendChild(msg);
+
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
 }
@@ -102,11 +139,13 @@ function addMessage(text, cls = "") {
 function setOnline(state) {
     if (state) {
         statusEl.textContent = "🟢 online";
+        notify.style.display = "none";
         input.disabled = false;
         sendBtn.disabled = false;
         input.focus();
     } else {
         statusEl.textContent = "🔴 offline";
+        notify.style.display = "block";
         input.disabled = true;
         sendBtn.disabled = true;
     }
@@ -121,10 +160,7 @@ function connect() {
     ws.onopen = () => {
         setOnline(true);
         addMessage("Соединение установлено", "system");
-        if (reconnectTimer) {
-            clearTimeout(reconnectTimer);
-            reconnectTimer = null;
-        }
+        clearTimeout(reconnectTimer);
     };
 
     ws.onmessage = (e) => {
@@ -137,7 +173,7 @@ function connect() {
 
     ws.onclose = () => {
         setOnline(false);
-        addMessage("Соединение потеряно. Переподключение...", "system");
+        addMessage("Переподключение...", "system");
         reconnectTimer = setTimeout(connect, 2000);
     };
 }
@@ -145,12 +181,14 @@ function connect() {
 function sendMessage() {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-    let text = input.value.trim();
+    const text = input.value.trim();
     if (!text) return;
 
     ws.send(text);
     input.value = "";
 }
+
+sendBtn.onclick = sendMessage;
 
 input.addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
@@ -161,4 +199,3 @@ connect();
 
 </body>
 </html>
-
