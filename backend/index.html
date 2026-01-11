@@ -17,7 +17,6 @@ body {
 }
 #chat {
   width:300px;
-  background:#020617;
   border:1px solid #334155;
   padding:10px;
 }
@@ -46,10 +45,13 @@ input {
 </div>
 
 <script>
-console.log("Mini chat started ✅");
-
+const nickname = prompt("Введите ник:");
 const protocol = location.protocol === "https:" ? "wss" : "ws";
 const ws = new WebSocket(`${protocol}://${location.host}/ws`);
+
+ws.onopen = () => {
+    ws.send(nickname);
+};
 
 ws.onmessage = (e) => {
     const d = document.createElement("div");

@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 import pathlib
 
 app = FastAPI()
-clients = []
+clients: list[tuple[WebSocket, str]] = []
 
 BASE = pathlib.Path(__file__).parent
 
@@ -21,11 +21,13 @@ async def favicon():
 @app.websocket("/ws")
 async def websocket(ws: WebSocket):
     await ws.accept()
-    clients.append(ws)
+    nickname = await ws.receive_text()  # первый пакет — ник
+    clients.append((ws, nickname))
+
     try:
         while True:
             msg = await ws.receive_text()
-            for c in clients:
-                await c.send_text(msg)
+            for c, name in clients:
+                await c.send_text(f"{nickname}: {msg}")
     except WebSocketDisconnect:
-        clients.remove(ws)
+        clients.remove((ws, nickname))
