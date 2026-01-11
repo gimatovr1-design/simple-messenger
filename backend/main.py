@@ -1,17 +1,16 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse
 import uvicorn
 
 app = FastAPI()
 
 
-# ===== HTTP главная страница (чтобы не было 404) =====
+# ===== HTTP: отдаём чат =====
 @app.get("/")
 async def root():
-    return HTMLResponse("Server online")
+    return FileResponse("index.html")
 
 
-# ===== WebSocket manager =====
 class ConnectionManager:
     def __init__(self):
         self.active: dict[WebSocket, str] = {}
@@ -34,18 +33,15 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-# ===== WebSocket endpoint =====
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await manager.connect(ws)
-
     await manager.broadcast(f"{manager.active[ws]} подключился")
 
     try:
         while True:
             text = await ws.receive_text()
 
-            # смена ника
             if text.startswith("/nick "):
                 new_nick = text.replace("/nick ", "", 1).strip()
                 if new_nick:
@@ -54,7 +50,6 @@ async def websocket_endpoint(ws: WebSocket):
                     await manager.broadcast(f"{old} сменил ник на {new_nick}")
                 continue
 
-            # обычное сообщение
             await manager.broadcast(f"{manager.active[ws]}: {text}")
 
     except WebSocketDisconnect:
@@ -63,6 +58,5 @@ async def websocket_endpoint(ws: WebSocket):
         await manager.broadcast(f"{username} отключился")
 
 
-# ===== запуск =====
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
