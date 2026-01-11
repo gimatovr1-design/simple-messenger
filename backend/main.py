@@ -1,30 +1,15 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from pathlib import Path
+from ws_manager import ConnectionManager
 
 app = FastAPI()
+manager = ConnectionManager()
+
+# онлайн пользователи
+online_users = set()
 
 HTML_FILE = Path(__file__).parent / "index.html"
-
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-
-
-manager = ConnectionManager()
 
 
 @app.get("/")
@@ -35,9 +20,39 @@ async def root():
 @app.websocket("/ws/chat")
 async def websocket_chat(websocket: WebSocket):
     await manager.connect(websocket)
+
+    username = None
+
     try:
+        # первый пакет — ник пользователя
+        data = await websocket.receive_json()
+        username = data.get("user", "anonymous")
+        online_users.add(username)
+
+        # сообщаем всем, что пользователь зашёл
+        await manager.broadcast_json({
+            "type": "join",
+            "user": username,
+            "online": list(online_users)
+        })
+
         while True:
-            data = await websocket.receive_text()
-            await manager.broadcast(data)
+            data = await websocket.receive_json()
+
+            await manager.broadcast_json({
+                "type": "message",
+                "user": username,
+                "text": data.get("text", "")
+            })
+
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+        if username:
+            online_users.discard(username)
+
+            await manager.broadcast_json({
+                "type": "leave",
+                "user": username,
+                "online": list(online_users)
+            })
