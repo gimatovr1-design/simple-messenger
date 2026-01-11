@@ -18,7 +18,6 @@ body {
     color: #fff;
 }
 
-/* === CHAT === */
 #chat {
     width: 360px;
     height: 520px;
@@ -30,7 +29,6 @@ body {
     overflow: hidden;
 }
 
-/* === HEADER === */
 header {
     padding: 10px;
     background: #1a1a1a;
@@ -53,12 +51,10 @@ header {
     opacity: 1;
 }
 
-/* === STATUS === */
 #status {
     font-size: 12px;
 }
 
-/* === NOTIFY === */
 #notify {
     display: none;
     background: #ff4444;
@@ -68,7 +64,6 @@ header {
     font-size: 13px;
 }
 
-/* === MESSAGES === */
 #messages {
     flex: 1;
     padding: 10px;
@@ -92,7 +87,6 @@ header {
     font-style: italic;
 }
 
-/* === FOOTER === */
 footer {
     display: flex;
     padding: 8px;
@@ -151,20 +145,22 @@ const notify = document.getElementById("notify");
 const nickEl = document.getElementById("nickname");
 const changeNickBtn = document.getElementById("changeNick");
 
-/* === NICKNAME === */
-let nickname = localStorage.getItem("nickname") || "Гость";
+/* === NICKNAME (НЕ СОХРАНЯЕТСЯ) === */
+let nickname = "Гость";
 
 function updateNick() {
     nickEl.textContent = nickname;
-    localStorage.setItem("nickname", nickname);
 }
 updateNick();
 
 changeNickBtn.onclick = () => {
     const newNick = prompt("Введите новый ник:", nickname);
     if (!newNick) return;
-    nickname = newNick.trim();
-    if (!nickname) return;
+
+    const trimmed = newNick.trim();
+    if (!trimmed) return;
+
+    nickname = trimmed;
     updateNick();
     addMessage(`Ник изменён на "${nickname}"`, "system");
 };
