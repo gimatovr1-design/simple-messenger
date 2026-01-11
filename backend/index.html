@@ -17,6 +17,7 @@ body {
     height: 100vh;
     align-items: center;
     justify-content: center;
+    gap: 10px;
 }
 
 #chat {
@@ -46,7 +47,25 @@ body {
     flex-direction: column;
 }
 
-#messages {
+#tabs {
+    display: flex;
+    background: #1a1a1a;
+}
+
+#tabs button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: #1a1a1a;
+    color: white;
+    cursor: pointer;
+}
+
+#tabs button.active {
+    background: #333;
+}
+
+.messages {
     flex: 1;
     padding: 10px;
     overflow-y: auto;
@@ -56,13 +75,13 @@ body {
     display: flex;
 }
 
-input {
+#input input {
     flex: 1;
     padding: 10px;
     border: none;
 }
 
-button {
+#input button {
     padding: 10px;
 }
 </style>
@@ -72,7 +91,7 @@ button {
 <!-- LOGIN -->
 <div id="login">
     <input id="username" placeholder="Логин">
-    <button onclick="login()">Войти</button>
+    <button id="loginBtn">Войти</button>
 </div>
 
 <!-- CHAT -->
@@ -80,22 +99,41 @@ button {
     <div id="users"></div>
 
     <div id="main">
-        <div id="messages"></div>
+        <div id="tabs">
+            <button id="tab-public">Общий чат</button>
+            <button id="tab-private">Приват</button>
+        </div>
+
+        <div id="messages-public" class="messages"></div>
+        <div id="messages-private" class="messages" style="display:none;"></div>
+
         <div id="input">
             <input id="text" placeholder="Сообщение">
-            <button onclick="send()">Отправить</button>
+            <button id="sendBtn">Отправить</button>
         </div>
     </div>
 </div>
 
 <script>
-let ws;
-let myName;
+let ws = null;
+let myName = "";
 let mode = "public";
 let privateWith = null;
 
-function login() {
-    myName = username.value.trim();
+/* ===== ELEMENTS ===== */
+const loginDiv = document.getElementById("login");
+const chatDiv = document.getElementById("chat");
+const usersDiv = document.getElementById("users");
+
+const tabPublic = document.getElementById("tab-public");
+const tabPrivate = document.getElementById("tab-private");
+
+const msgPublic = document.getElementById("messages-public");
+const msgPrivate = document.getElementById("messages-private");
+
+/* ===== LOGIN ===== */
+document.getElementById("loginBtn").onclick = () => {
+    myName = document.getElementById("username").value.trim();
     if (!myName) return;
 
     ws = new WebSocket(`ws://${location.host}/ws`);
@@ -106,44 +144,70 @@ function login() {
             username: myName
         }));
 
-        login.style.display = "none";
-        chat.style.display = "flex";
+        loginDiv.style.display = "none";
+        chatDiv.style.display = "flex";
+        openPublic();
     };
 
     ws.onmessage = (e) => {
         const data = JSON.parse(e.data);
 
         if (data.type === "users") {
-            users.innerHTML = "<b>Онлайн</b><br>";
+            usersDiv.innerHTML = "<b>Онлайн</b><br>";
             data.users.forEach(u => {
                 if (u !== myName) {
                     const div = document.createElement("div");
                     div.textContent = u;
                     div.onclick = () => openPrivate(u);
-                    users.appendChild(div);
+                    usersDiv.appendChild(div);
                 }
             });
         }
 
         if (data.type === "public") {
-            add(`${data.from}: ${data.text}`);
+            addPublic(`${data.from}: ${data.text}`);
         }
 
         if (data.type === "private") {
-            add(`🔒 ${data.from}: ${data.text}`);
+            addPrivate(`🔒 ${data.from}: ${data.text}`);
         }
     };
+};
+
+/* ===== TABS ===== */
+tabPublic.onclick = openPublic;
+tabPrivate.onclick = openPrivateTab;
+
+function openPublic() {
+    mode = "public";
+    msgPublic.style.display = "block";
+    msgPrivate.style.display = "none";
+    tabPublic.classList.add("active");
+    tabPrivate.classList.remove("active");
 }
 
-function openPrivate(user) {
+function openPrivateTab() {
     mode = "private";
-    privateWith = user;
-    add(`🔒 Приватный чат с ${user}`);
+    msgPublic.style.display = "none";
+    msgPrivate.style.display = "block";
+    tabPrivate.classList.add("active");
+    tabPublic.classList.remove("active");
 }
+
+/* ===== PRIVATE CHAT ===== */
+function openPrivate(user) {
+    privateWith = user;
+    openPrivateTab();
+    addPrivate(`🔒 Чат с ${user}`);
+}
+
+/* ===== SEND ===== */
+document.getElementById("sendBtn").onclick = send;
 
 function send() {
-    const text = document.getElementById("text").value;
-    if (!text) return;
+    const input = document.getElementById("text");
+    const text = input.value.trim();
+    if (!text || !ws) return;
 
     if (mode === "public") {
         ws.send(JSON.stringify({
@@ -151,7 +215,7 @@ function send() {
             mode: "public",
             text
         }));
-    } else {
+    } else if (privateWith) {
         ws.send(JSON.stringify({
             type: "message",
             mode: "private",
@@ -160,17 +224,24 @@ function send() {
         }));
     }
 
-    document.getElementById("text").value = "";
+    input.value = "";
 }
 
-function add(text) {
+/* ===== ADD MESSAGE ===== */
+function addPublic(text) {
     const div = document.createElement("div");
     div.textContent = text;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+    msgPublic.appendChild(div);
+    msgPublic.scrollTop = msgPublic.scrollHeight;
+}
+
+function addPrivate(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    msgPrivate.appendChild(div);
+    msgPrivate.scrollTop = msgPrivate.scrollHeight;
 }
 </script>
 
 </body>
 </html>
-
