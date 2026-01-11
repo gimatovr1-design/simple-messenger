@@ -3,19 +3,19 @@ from fastapi.responses import HTMLResponse, FileResponse
 import pathlib
 
 app = FastAPI()
-clients: list[WebSocket] = []
+clients = []
 
-BASE_DIR = pathlib.Path(__file__).parent
+BASE = pathlib.Path(__file__).parent
 
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    return (BASE_DIR / "index.html").read_text(encoding="utf-8")
+    return (BASE / "index.html").read_text(encoding="utf-8")
 
 
 @app.get("/favicon.ico")
 async def favicon():
-    return FileResponse(BASE_DIR / "favicon.ico")
+    return FileResponse(BASE / "favicon.ico")
 
 
 @app.websocket("/ws")

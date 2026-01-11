@@ -2,22 +2,36 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Simple Messenger</title>
+<title>Mini Chat</title>
 <link rel="icon" href="/favicon.ico">
 <style>
 body {
   background:#020617;
   color:white;
   font-family:sans-serif;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+  margin:0;
 }
-#messages {
-  height:85vh;
-  overflow-y:auto;
+#chat {
+  width:300px;
+  background:#020617;
   border:1px solid #334155;
   padding:10px;
 }
-input, button {
-  padding:8px;
+#messages {
+  height:180px;
+  overflow-y:auto;
+  border:1px solid #334155;
+  padding:5px;
+  margin-bottom:5px;
+  font-size:14px;
+}
+input {
+  width:100%;
+  padding:6px;
   background:#020617;
   color:white;
   border:1px solid #334155;
@@ -26,32 +40,31 @@ input, button {
 </head>
 <body>
 
-<h3>Публичный чат</h3>
-<div id="messages"></div>
-<input id="msg" placeholder="Сообщение">
-<button onclick="send()">Отправить</button>
+<div id="chat">
+  <div id="messages"></div>
+  <input id="msg" placeholder="Сообщение" autocomplete="off">
+</div>
 
 <script>
-console.log("JS started ✅");
+console.log("Mini chat started ✅");
 
 const protocol = location.protocol === "https:" ? "wss" : "ws";
 const ws = new WebSocket(`${protocol}://${location.host}/ws`);
 
-ws.onopen = () => console.log("WS connected ✅");
-
 ws.onmessage = (e) => {
-    console.log("MSG:", e.data);
     const d = document.createElement("div");
     d.textContent = e.data;
-    document.getElementById("messages").appendChild(d);
+    const m = document.getElementById("messages");
+    m.appendChild(d);
+    m.scrollTop = m.scrollHeight;
 };
 
-function send() {
-    const input = document.getElementById("msg");
-    if (!input.value) return;
-    ws.send(input.value);
-    input.value = "";
-}
+document.getElementById("msg").addEventListener("keydown", e => {
+    if (e.key === "Enter" && e.target.value.trim()) {
+        ws.send(e.target.value);
+        e.target.value = "";
+    }
+});
 </script>
 
 </body>
