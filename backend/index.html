@@ -5,80 +5,54 @@
 <title>Simple Messenger</title>
 <link rel="icon" href="/favicon.ico">
 <style>
-body { margin:0; display:flex; height:100vh; background:#020617; color:white; font-family:sans-serif }
-#users { width:220px; border-right:1px solid #1e293b; padding:10px }
-.user { padding:5px; cursor:pointer }
-.user:hover { background:#2563eb }
-#chat { flex:1; display:flex; flex-direction:column }
-#messages { flex:1; padding:10px; overflow-y:auto }
-input,button { background:#020617; color:white; border:1px solid #334155; padding:8px }
+body {
+  background:#020617;
+  color:white;
+  font-family:sans-serif;
+}
+#messages {
+  height:85vh;
+  overflow-y:auto;
+  border:1px solid #334155;
+  padding:10px;
+}
+input, button {
+  padding:8px;
+  background:#020617;
+  color:white;
+  border:1px solid #334155;
+}
 </style>
 </head>
 <body>
 
-<div id="users"></div>
-
-<div id="chat">
-  <div id="messages"></div>
-  <div style="display:flex">
-    <input id="to" placeholder="Кому" readonly>
-    <input id="message" placeholder="Сообщение" style="flex:1">
-    <button onclick="send()">▶</button>
-  </div>
-</div>
+<h3>Публичный чат</h3>
+<div id="messages"></div>
+<input id="msg" placeholder="Сообщение">
+<button onclick="send()">Отправить</button>
 
 <script>
-let username = localStorage.getItem("username");
-if (!username) {
-    username = prompt("Введите ник:");
-    localStorage.setItem("username", username);
-}
+console.log("JS started ✅");
 
-const ws = new WebSocket(`wss://${location.host}/ws/${username}`);
-const usersDiv = document.getElementById("users");
-const messagesDiv = document.getElementById("messages");
+const protocol = location.protocol === "https:" ? "wss" : "ws";
+const ws = new WebSocket(`${protocol}://${location.host}/ws`);
+
+ws.onopen = () => console.log("WS connected ✅");
 
 ws.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-    console.log("WS:", data); // 👈 важно для отладки
-
-    if (data.type === "users") {
-        usersDiv.innerHTML = "<b>Пользователи</b><br>";
-        data.users.forEach(u => {
-            if (u !== username) {
-                const d = document.createElement("div");
-                d.textContent = u;
-                d.className = "user";
-                d.onclick = () => document.getElementById("to").value = u;
-                usersDiv.appendChild(d);
-            }
-        });
-        return;
-    }
-
-    if (data.type === "message") {
-        addMessage(`${data.from}: ${data.message}`);
-    }
+    console.log("MSG:", e.data);
+    const d = document.createElement("div");
+    d.textContent = e.data;
+    document.getElementById("messages").appendChild(d);
 };
 
 function send() {
-    const to = document.getElementById("to").value;
-    const msg = document.getElementById("message").value;
-    if (!to || !msg) return;
-
-    ws.send(JSON.stringify({ to, message: msg }));
-    addMessage(`Я → ${to}: ${msg}`);
-    document.getElementById("message").value = "";
-}
-
-function addMessage(text) {
-    const d = document.createElement("div");
-    d.textContent = text;
-    messagesDiv.appendChild(d);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight; // 🔥 АВТОСКРОЛЛ
+    const input = document.getElementById("msg");
+    if (!input.value) return;
+    ws.send(input.value);
+    input.value = "";
 }
 </script>
-
 
 </body>
 </html>

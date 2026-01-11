@@ -1,31 +1,31 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from ws_manager import ConnectionManager
+from fastapi.responses import HTMLResponse, FileResponse
+import pathlib
 
 app = FastAPI()
-manager = ConnectionManager()
+clients: list[WebSocket] = []
 
-app.mount("/static", StaticFiles(directory="."), name="static")
+BASE_DIR = pathlib.Path(__file__).parent
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 async def index():
-    return FileResponse("index.html")
+    return (BASE_DIR / "index.html").read_text(encoding="utf-8")
 
 
 @app.get("/favicon.ico")
 async def favicon():
-    return FileResponse("favicon.ico")
+    return FileResponse(BASE_DIR / "favicon.ico")
 
 
-@app.websocket("/ws/{username}")
-async def websocket(ws: WebSocket, username: str):
-    await manager.connect(ws, username)
+@app.websocket("/ws")
+async def websocket(ws: WebSocket):
+    await ws.accept()
+    clients.append(ws)
     try:
         while True:
-            data = await ws.receive_json()
-            await manager.send_private(username, data["to"], data["message"])
+            msg = await ws.receive_text()
+            for c in clients:
+                await c.send_text(msg)
     except WebSocketDisconnect:
-        manager.disconnect(username)
-        await manager.broadcast_users()
+        clients.remove(ws)
