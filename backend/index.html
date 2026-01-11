@@ -150,7 +150,7 @@ input::placeholder { color: #94a3b8; }
 </div>
 
 <script>
-/* ---------- НИК (ИСПРАВЛЕНО) ---------- */
+/* ---------- НИК (БЕЗ null) ---------- */
 let nickname = localStorage.getItem("nickname");
 
 if (!nickname || nickname === "null") {
@@ -209,7 +209,13 @@ function sendMessage() {
 }
 
 sendBtn.onclick = sendMessage;
-input.onkeydown = e => e.key === "Enter" && sendMessage();
+
+/* ✅ ИСПРАВЛЕНИЕ: ввод больше не блокируется */
+input.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+        sendMessage();
+    }
+});
 
 /* ---------- CHANGE NICK ---------- */
 document.getElementById("changeNick").onclick = () => {
