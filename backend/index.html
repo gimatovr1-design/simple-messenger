@@ -2,46 +2,21 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Private Chat</title>
+<title>Encrypted Chat</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+
 <style>
 body {
-    background: #0b1220;
-    color: white;
-    font-family: Arial;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
+    background:#0b1220;color:white;font-family:Arial;
+    display:flex;justify-content:center;align-items:center;height:100vh
 }
-#login, #chat {
-    background: #111a2e;
-    padding: 20px;
-    border-radius: 12px;
-    width: 340px;
-}
-#chat { display: none; }
-#users div {
-    cursor: pointer;
-    padding: 5px;
-}
-#users div:hover {
-    background: #1e2a44;
-}
-#users .active {
-    background: #00bfff;
-}
-#messages {
-    height: 160px;
-    overflow-y: auto;
-    border: 1px solid #222;
-    margin: 10px 0;
-    padding: 5px;
-}
-#status {
-    font-size: 12px;
-    opacity: 0.7;
-    margin-bottom: 5px;
-}
+#login,#chat{background:#111a2e;padding:20px;border-radius:12px;width:340px}
+#chat{display:none}
+#users div{cursor:pointer;padding:5px}
+#users .active{background:#00bfff}
+#messages{height:160px;overflow-y:auto;border:1px solid #222;margin:10px 0;padding:5px}
+#status{font-size:12px;opacity:.7}
 </style>
 </head>
 <body>
@@ -53,8 +28,8 @@ body {
 </div>
 
 <div id="chat">
-    <div id="status">🔴 не подключено</div>
-    <div><b>Пользователи:</b></div>
+    <div id="status">🔴 offline</div>
+    <b>Пользователи:</b>
     <div id="users"></div>
     <hr>
     <div id="messages"></div>
@@ -63,99 +38,97 @@ body {
 </div>
 
 <script>
-let ws;
+let ws, currentUser="";
 let username = localStorage.getItem("username") || "";
-let currentUser = "";
-let reconnectTimer = null;
 
 document.getElementById("username").value = username;
 
-function connect() {
-    const proto = location.protocol === "https:" ? "wss://" : "ws://";
+function keyFor(user){
+    return [username,user].sort().join("_secret_");
+}
+
+function encrypt(text, user){
+    return CryptoJS.AES.encrypt(text, keyFor(user)).toString();
+}
+
+function decrypt(text, user){
+    try{
+        return CryptoJS.AES.decrypt(text, keyFor(user)).toString(CryptoJS.enc.Utf8);
+    }catch{ return "🔒 encrypted"; }
+}
+
+function connect(){
+    const proto = location.protocol==="https:"?"wss://":"ws://";
     ws = new WebSocket(proto + location.host + "/ws/chat");
 
-    ws.onopen = () => {
-        setStatus("🟢 подключено");
-        ws.send("__join__" + username);
+    ws.onopen = ()=>{
+        setStatus("🟢 online");
+        ws.send("__join__"+username);
     };
 
-    ws.onmessage = (e) => {
-        if (e.data.startsWith("__users__")) {
-            renderUsers(e.data.replace("__users__", "").split(","));
-        } else {
-            addMessage(e.data);
+    ws.onmessage = e=>{
+        if(e.data.startsWith("__users__")){
+            renderUsers(e.data.replace("__users__","").split(","));
+        }else{
+            let [from,msg] = e.data.split(": ",2);
+            addMessage(from+": "+decrypt(msg, from));
         }
     };
 
-    ws.onclose = () => {
-        setStatus("🔴 соединение потеряно, переподключение...");
-        reconnectTimer = setTimeout(connect, 2000);
-    };
-
-    ws.onerror = () => {
-        ws.close();
+    ws.onclose = ()=>{
+        setStatus("🔴 reconnecting...");
+        setTimeout(connect,2000);
     };
 }
 
-function enter() {
-    username = document.getElementById("username").value.trim();
-    if (!username) return alert("Введите ник");
-
-    localStorage.setItem("username", username);
-
-    document.getElementById("login").style.display = "none";
-    document.getElementById("chat").style.display = "block";
-
+function enter(){
+    username=document.getElementById("username").value.trim();
+    if(!username)return;
+    localStorage.setItem("username",username);
+    document.getElementById("login").style.display="none";
+    document.getElementById("chat").style.display="block";
     connect();
 }
 
-function renderUsers(list) {
-    const box = document.getElementById("users");
-    box.innerHTML = "";
-
-    list.forEach(u => {
-        if (!u || u === username) return;
-
-        const div = document.createElement("div");
-        div.textContent = u;
-        div.onclick = () => {
-            currentUser = u;
-            document.querySelectorAll("#users div").forEach(x => x.classList.remove("active"));
-            div.classList.add("active");
-            document.getElementById("messages").innerHTML = "";
+function renderUsers(list){
+    const box=document.getElementById("users");
+    box.innerHTML="";
+    list.forEach(u=>{
+        if(!u||u===username)return;
+        const d=document.createElement("div");
+        d.textContent=u;
+        d.onclick=()=>{
+            currentUser=u;
+            document.querySelectorAll("#users div").forEach(x=>x.classList.remove("active"));
+            d.classList.add("active");
+            document.getElementById("messages").innerHTML="";
         };
-        box.appendChild(div);
+        box.appendChild(d);
     });
 }
 
-function send() {
-    if (!currentUser) return alert("Выбери пользователя");
-
-    const input = document.getElementById("message");
-    const text = input.value.trim();
-    if (!text) return;
-
-    ws.send(`__to__${currentUser}|${text}`);
-    input.value = "";
+function send(){
+    if(!currentUser)return alert("Выбери пользователя");
+    const i=document.getElementById("message");
+    if(!i.value)return;
+    ws.send(`__to__${currentUser}|${encrypt(i.value,currentUser)}`);
+    addMessage("Вы",i.value);
+    i.value="";
 }
 
-function addMessage(text) {
-    const d = document.createElement("div");
-    d.textContent = text;
+function addMessage(t){
+    const d=document.createElement("div");
+    d.textContent=t;
     document.getElementById("messages").appendChild(d);
 }
 
-function setStatus(text) {
-    document.getElementById("status").textContent = text;
-}
+function setStatus(t){document.getElementById("status").textContent=t}
 
-// автологин после обновления страницы
-if (username) {
-    document.getElementById("login").style.display = "none";
-    document.getElementById("chat").style.display = "block";
+if(username){
+    document.getElementById("login").style.display="none";
+    document.getElementById("chat").style.display="block";
     connect();
 }
 </script>
-
 </body>
 </html>
