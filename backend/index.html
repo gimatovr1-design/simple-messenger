@@ -38,22 +38,11 @@ header {
     font-size: 13px;
 }
 
-#nickname {
-    font-weight: bold;
-}
+#nickname { font-weight: bold; }
+#changeNick { cursor: pointer; opacity: .7; }
+#changeNick:hover { opacity: 1; }
 
-#changeNick {
-    cursor: pointer;
-    opacity: 0.7;
-}
-
-#changeNick:hover {
-    opacity: 1;
-}
-
-#status {
-    font-size: 12px;
-}
+#status { font-size: 12px; }
 
 #notify {
     display: none;
@@ -71,21 +60,9 @@ header {
     font-size: 14px;
 }
 
-.message {
-    margin-bottom: 6px;
-    word-break: break-word;
-}
-
-.time {
-    color: #777;
-    font-size: 11px;
-    margin-right: 6px;
-}
-
-.system {
-    color: #888;
-    font-style: italic;
-}
+.message { margin-bottom: 6px; word-break: break-word; }
+.time { color: #777; font-size: 11px; margin-right: 6px; }
+.system { color: #888; font-style: italic; }
 
 footer {
     display: flex;
@@ -123,7 +100,6 @@ button {
 </header>
 
 <div id="notify">⚠️ Соединение потеряно</div>
-
 <div id="messages"></div>
 
 <footer>
@@ -145,36 +121,27 @@ const notify = document.getElementById("notify");
 const nickEl = document.getElementById("nickname");
 const changeNickBtn = document.getElementById("changeNick");
 
-/* === NICKNAME (НЕ СОХРАНЯЕТСЯ) === */
+/* === NICK (SESSION ONLY) === */
 let nickname = "Гость";
-
-function updateNick() {
-    nickEl.textContent = nickname;
-}
-updateNick();
+nickEl.textContent = nickname;
 
 changeNickBtn.onclick = () => {
-    const newNick = prompt("Введите новый ник:", nickname);
-    if (!newNick) return;
-
-    const trimmed = newNick.trim();
-    if (!trimmed) return;
-
-    nickname = trimmed;
-    updateNick();
+    const n = prompt("Введите новый ник:", nickname);
+    if (!n) return;
+    const t = n.trim();
+    if (!t) return;
+    nickname = t;
+    nickEl.textContent = nickname;
     addMessage(`Ник изменён на "${nickname}"`, "system");
 };
 
-/* === TIME === */
 function now() {
-    const d = new Date();
-    return d.toLocaleTimeString("ru-RU", {
+    return new Date().toLocaleTimeString("ru-RU", {
         hour: "2-digit",
         minute: "2-digit"
     });
 }
 
-/* === MESSAGE === */
 function addMessage(text, cls = "") {
     const div = document.createElement("div");
     div.className = "message " + cls;
@@ -186,29 +153,19 @@ function addMessage(text, cls = "") {
     const msg = document.createElement("span");
     msg.textContent = text;
 
-    div.appendChild(time);
-    div.appendChild(msg);
+    div.append(time, msg);
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
 }
 
-/* === STATUS === */
 function setOnline(state) {
-    if (state) {
-        statusEl.textContent = "🟢 online";
-        notify.style.display = "none";
-        input.disabled = false;
-        sendBtn.disabled = false;
-        input.focus();
-    } else {
-        statusEl.textContent = "🔴 offline";
-        notify.style.display = "block";
-        input.disabled = true;
-        sendBtn.disabled = true;
-    }
+    statusEl.textContent = state ? "🟢 online" : "🔴 offline";
+    notify.style.display = state ? "none" : "block";
+    input.disabled = !state;
+    sendBtn.disabled = !state;
+    if (state) input.focus();
 }
 
-/* === WS === */
 function connect() {
     ws = new WebSocket(
         (location.protocol === "https:" ? "wss://" : "ws://") +
@@ -221,9 +178,7 @@ function connect() {
         clearTimeout(reconnectTimer);
     };
 
-    ws.onmessage = (e) => {
-        addMessage(e.data);
-    };
+    ws.onmessage = e => addMessage(e.data);
 
     ws.onclose = () => {
         setOnline(false);
@@ -232,21 +187,23 @@ function connect() {
     };
 }
 
-/* === SEND === */
 function sendMessage() {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
     const text = input.value.trim();
     if (!text) return;
 
-    ws.send(`${nickname}: ${text}`);
+    if (text.startsWith(nickname + ":")) {
+        ws.send(text);
+    } else {
+        ws.send(`${nickname}: ${text}`);
+    }
+
     input.value = "";
 }
 
 sendBtn.onclick = sendMessage;
-input.addEventListener("keydown", e => {
-    if (e.key === "Enter") sendMessage();
-});
+input.onkeydown = e => e.key === "Enter" && sendMessage();
 
 connect();
 </script>
