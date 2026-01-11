@@ -13,8 +13,11 @@ MESSAGES_FILE = os.path.join(BASE_DIR, "messages.json")
 def load_messages():
     if not os.path.exists(MESSAGES_FILE):
         return []
-    with open(MESSAGES_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(MESSAGES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return []
 
 
 def save_message(message: dict):
@@ -37,13 +40,14 @@ class ConnectionManager:
         await websocket.accept()
         self.active[websocket] = ""
 
-        # история
+        # отправляем историю
         for msg in load_messages():
-            await websocket.send_json({
-                "type": "message",
-                "nick": msg["nick"],
-                "text": msg["text"]
-            })
+            if isinstance(msg, dict):
+                await websocket.send_json({
+                    "type": "message",
+                    "nick": msg.get("nick", ""),
+                    "text": msg.get("text", "")
+                })
 
     def disconnect(self, websocket: WebSocket):
         self.active.pop(websocket, None)
@@ -70,15 +74,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            data = await websocket.receive_text()
-            data = data.strip()
-
-            if not data:
+            text = (await websocket.receive_text()).strip()
+            if not text:
                 continue
 
             # установка ника
-            if data.startswith("/nick "):
-                nick = data.replace("/nick ", "").strip()
+            if text.startswith("/nick "):
+                nick = text.replace("/nick ", "").strip()
                 if not nick:
                     await websocket.send_json({
                         "type": "system",
@@ -103,7 +105,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
             await manager.broadcast({
                 "nick": nick,
-                "text": data
+                "text": text
             })
 
     except WebSocketDisconnect:
