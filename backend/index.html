@@ -35,12 +35,14 @@ if (!username) {
 }
 
 const ws = new WebSocket(`wss://${location.host}/ws/${username}`);
+const usersDiv = document.getElementById("users");
+const messagesDiv = document.getElementById("messages");
 
 ws.onmessage = (e) => {
     const data = JSON.parse(e.data);
+    console.log("WS:", data); // 👈 важно для отладки
 
     if (data.type === "users") {
-        const usersDiv = document.getElementById("users");
         usersDiv.innerHTML = "<b>Пользователи</b><br>";
         data.users.forEach(u => {
             if (u !== username) {
@@ -51,10 +53,11 @@ ws.onmessage = (e) => {
                 usersDiv.appendChild(d);
             }
         });
+        return;
     }
 
     if (data.type === "message") {
-        add(`${data.from}: ${data.message}`);
+        addMessage(`${data.from}: ${data.message}`);
     }
 };
 
@@ -62,17 +65,20 @@ function send() {
     const to = document.getElementById("to").value;
     const msg = document.getElementById("message").value;
     if (!to || !msg) return;
+
     ws.send(JSON.stringify({ to, message: msg }));
-    add(`Я → ${to}: ${msg}`);
+    addMessage(`Я → ${to}: ${msg}`);
     document.getElementById("message").value = "";
 }
 
-function add(text) {
+function addMessage(text) {
     const d = document.createElement("div");
     d.textContent = text;
-    document.getElementById("messages").appendChild(d);
+    messagesDiv.appendChild(d);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight; // 🔥 АВТОСКРОЛЛ
 }
 </script>
+
 
 </body>
 </html>
