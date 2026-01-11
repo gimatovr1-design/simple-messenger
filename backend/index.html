@@ -2,139 +2,176 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Encrypted Chat</title>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<title>Simple Messenger</title>
 
 <style>
 body {
-    background:#0b1220;color:white;font-family:Arial;
-    display:flex;justify-content:center;align-items:center;height:100vh
+    margin: 0;
+    font-family: Arial, sans-serif;
+    display: flex;
+    height: 100vh;
 }
-#login,#chat{background:#111a2e;padding:20px;border-radius:12px;width:340px}
-#chat{display:none}
-#users div{cursor:pointer;padding:5px}
-#users .active{background:#00bfff}
-#messages{height:160px;overflow-y:auto;border:1px solid #222;margin:10px 0;padding:5px}
-#status{font-size:12px;opacity:.7}
+
+#users {
+    width: 220px;
+    border-right: 1px solid #ccc;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.user {
+    padding: 6px;
+    cursor: pointer;
+}
+
+.user:hover {
+    background: #eee;
+}
+
+.user.active {
+    background: #ddd;
+    font-weight: bold;
+}
+
+#chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#messages {
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+#input {
+    display: flex;
+    border-top: 1px solid #ccc;
+}
+
+#input input {
+    flex: 1;
+    padding: 10px;
+}
+
+#input button {
+    padding: 10px;
+}
 </style>
 </head>
+
 <body>
 
-<div id="login">
-    <h3>Вход</h3>
-    <input id="username" placeholder="Ваш ник">
-    <button onclick="enter()">Войти</button>
-</div>
+<div id="users"></div>
 
 <div id="chat">
-    <div id="status">🔴 offline</div>
-    <b>Пользователи:</b>
-    <div id="users"></div>
-    <hr>
     <div id="messages"></div>
-    <input id="message" placeholder="Сообщение">
-    <button onclick="send()">Отправить</button>
+    <div id="input">
+        <input id="msg" placeholder="Сообщение">
+        <button onclick="sendMessage()">Отправить</button>
+    </div>
 </div>
 
 <script>
-let ws, currentUser="";
-let username = localStorage.getItem("username") || "";
+/* ====== НАСТРОЙКИ ====== */
+const username = prompt("Введи ник").trim().toLowerCase();
+const ws = new WebSocket(`wss://${location.host}/ws/${username}`);
 
-document.getElementById("username").value = username;
+/* ====== СОСТОЯНИЕ ====== */
+let selectedUser = null;
 
-function keyFor(user){
-    return [username,user].sort().join("_secret_");
+/* ====== DOM ====== */
+const usersDiv = document.getElementById("users");
+const messagesDiv = document.getElementById("messages");
+const msgInput = document.getElementById("msg");
+
+/* ====== ШИФРОВАНИЕ (упрощено, можно заменить на AES) ====== */
+function encrypt(text) {
+    return btoa(text);
+}
+function decrypt(text) {
+    return atob(text);
 }
 
-function encrypt(text, user){
-    return CryptoJS.AES.encrypt(text, keyFor(user)).toString();
-}
+/* ====== WEBSOCKET ====== */
+ws.onopen = () => {
+    console.log("WS connected");
+};
 
-function decrypt(text, user){
-    try{
-        return CryptoJS.AES.decrypt(text, keyFor(user)).toString(CryptoJS.enc.Utf8);
-    }catch{ return "🔒 encrypted"; }
-}
+ws.onmessage = (e) => {
+    console.log("RAW WS:", e.data);
 
-function connect(){
-    const proto = location.protocol==="https:"?"wss://":"ws://";
-    ws = new WebSocket(proto + location.host + "/ws/chat");
-
-    ws.onopen = ()=>{
-        setStatus("🟢 online");
-        ws.send("__join__"+username);
-    };
-
-    ws.onmessage = (e) => {
-    const data = JSON.parse(e.data);
+    let data;
+    try {
+        data = JSON.parse(e.data);
+    } catch (err) {
+        console.warn("NOT JSON FROM SERVER:", e.data);
+        return; // 💪 защита, клиент не падает
+    }
 
     if (data.type === "users") {
         renderUsers(data.users);
+        return;
     }
 
     if (data.type === "message") {
-        const decrypted = decrypt(data.text, data.from);
-        addMessage(data.from + ": " + decrypted);
+        addMessage(data.from + ": " + decrypt(data.text));
     }
 };
 
-    
+ws.onclose = () => {
+    console.log("WS closed");
+};
 
-    ws.onclose = ()=>{
-        setStatus("🔴 reconnecting...");
-        setTimeout(connect,2000);
-    };
-}
+/* ====== UI ====== */
+function renderUsers(users) {
+    usersDiv.innerHTML = "";
 
-function enter(){
-    username=document.getElementById("username").value.trim();
-    if(!username)return;
-    localStorage.setItem("username",username);
-    document.getElementById("login").style.display="none";
-    document.getElementById("chat").style.display="block";
-    connect();
-}
+    users.forEach(u => {
+        if (u === username) return;
 
-function renderUsers(list){
-    const box=document.getElementById("users");
-    box.innerHTML="";
-    list.forEach(u=>{
-        if(!u||u===username)return;
-        const d=document.createElement("div");
-        d.textContent=u;
-        d.onclick=()=>{
-            currentUser=u;
-            document.querySelectorAll("#users div").forEach(x=>x.classList.remove("active"));
-            d.classList.add("active");
-            document.getElementById("messages").innerHTML="";
+        const div = document.createElement("div");
+        div.textContent = u;
+        div.className = "user";
+
+        div.onclick = () => {
+            selectedUser = u;
+            document.querySelectorAll(".user")
+                .forEach(el => el.classList.remove("active"));
+            div.classList.add("active");
         };
-        box.appendChild(d);
+
+        usersDiv.appendChild(div);
     });
 }
 
-function send(){
-    if(!currentUser)return alert("Выбери пользователя");
-    const i=document.getElementById("message");
-    if(!i.value)return;
-    ws.send(`__to__${currentUser}|${encrypt(i.value,currentUser)}`);
-    addMessage("Вы",i.value);
-    i.value="";
+function sendMessage() {
+    if (!selectedUser) {
+        alert("Выбери пользователя");
+        return;
+    }
+
+    const text = msgInput.value.trim();
+    if (!text) return;
+
+    ws.send(JSON.stringify({
+        type: "message",
+        to: selectedUser,
+        text: encrypt(text)
+    }));
+
+    addMessage("Я: " + text);
+    msgInput.value = "";
 }
 
-function addMessage(t){
-    const d=document.createElement("div");
-    d.textContent=t;
-    document.getElementById("messages").appendChild(d);
-}
-
-function setStatus(t){document.getElementById("status").textContent=t}
-
-if(username){
-    document.getElementById("login").style.display="none";
-    document.getElementById("chat").style.display="block";
-    connect();
+function addMessage(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    messagesDiv.appendChild(div);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 </script>
+
 </body>
 </html>

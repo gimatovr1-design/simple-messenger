@@ -1,50 +1,41 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
-from pathlib import Path
 
 app = FastAPI()
-HTML_FILE = Path(__file__).parent / "index.html"
 
 connections = {}  # username -> websocket
 
-@app.get("/")
-async def get():
-    return HTMLResponse(HTML_FILE.read_text(encoding="utf-8"))
 
-@app.websocket("/ws/chat")
-async def websocket(ws: WebSocket):
+async def send_users():
+    users = list(connections.keys())
+    for ws in connections.values():
+        await ws.send_json({
+            "type": "users",
+            "users": users
+        })
+
+
+@app.websocket("/ws/{username}")
+async def websocket_endpoint(ws: WebSocket, username: str):
     await ws.accept()
-    username = None
+
+    username = username.strip().lower()
+    connections[username] = ws
+    await send_users()
 
     try:
         while True:
-            data = await ws.receive_text()
+            data = await ws.receive_json()  # 👈 ТОЛЬКО JSON
 
-            # регистрация пользователя
-            if data.startswith("__join__"):
-                username = data.replace("__join__", "")
-                connections[username] = ws
-                await broadcast_users()
-                continue
-
-            # приватное сообщение
-            if data.startswith("__to__"):
-                target, msg = data.replace("__to__", "").split("|", 1)
-
-                if target in connections:
-                    await connections[target].send_text(
-                        f"{username}: {msg}"
-                    )
-                    await ws.send_text(
-                        f"Вы → {target}: {msg}"
-                    )
+            if data.get("type") == "message":
+                to_user = data.get("to")
+                if to_user in connections:
+                    await connections[to_user].send_json({
+                        "type": "message",
+                        "from": username,
+                        "text": data.get("text")
+                    })
 
     except WebSocketDisconnect:
-        if username in connections:
-            del connections[username]
-            await broadcast_users()
+        connections.pop(username, None)
+        await send_users()
 
-async def broadcast_users():
-    users = ",".join(connections.keys())
-    for ws in connections.values():
-        await ws.send_text("__users__" + users)
