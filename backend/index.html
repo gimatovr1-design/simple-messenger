@@ -7,17 +7,17 @@
 <style>
 body {
     margin: 0;
-    font-family: Arial;
+    font-family: Arial, sans-serif;
     background: #0f0f0f;
-    color: white;
+    color: #fff;
 }
 
 #login {
-    display: flex;
     height: 100vh;
-    align-items: center;
-    justify-content: center;
+    display: flex;
     gap: 10px;
+    justify-content: center;
+    align-items: center;
 }
 
 #chat {
@@ -115,6 +115,7 @@ body {
 </div>
 
 <script>
+/* ===== STATE ===== */
 let ws = null;
 let myName = "";
 let mode = "public";
@@ -136,7 +137,8 @@ document.getElementById("loginBtn").onclick = () => {
     myName = document.getElementById("username").value.trim();
     if (!myName) return;
 
-    ws = new WebSocket(`ws://${location.host}/ws`);
+    const protocol = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(`${protocol}://${location.host}/ws`);
 
     ws.onopen = () => {
         ws.send(JSON.stringify({
@@ -171,6 +173,10 @@ document.getElementById("loginBtn").onclick = () => {
         if (data.type === "private") {
             addPrivate(`🔒 ${data.from}: ${data.text}`);
         }
+    };
+
+    ws.onerror = () => {
+        alert("Ошибка подключения WebSocket");
     };
 };
 
