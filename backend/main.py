@@ -1,9 +1,17 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
 import uvicorn
 
 app = FastAPI()
 
 
+# ===== HTTP главная страница (чтобы не было 404) =====
+@app.get("/")
+async def root():
+    return HTMLResponse("Server online")
+
+
+# ===== WebSocket manager =====
 class ConnectionManager:
     def __init__(self):
         self.active: dict[WebSocket, str] = {}
@@ -26,6 +34,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+# ===== WebSocket endpoint =====
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await manager.connect(ws)
@@ -54,5 +63,6 @@ async def websocket_endpoint(ws: WebSocket):
         await manager.broadcast(f"{username} отключился")
 
 
+# ===== запуск =====
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
