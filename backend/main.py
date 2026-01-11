@@ -1,8 +1,15 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
 
 app = FastAPI()
 
 connections = {}  # username -> websocket
+
+
+@app.get("/")
+async def index():
+    with open("index.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
 
 async def send_users():
@@ -17,19 +24,17 @@ async def send_users():
 @app.websocket("/ws/{username}")
 async def websocket_endpoint(ws: WebSocket, username: str):
     await ws.accept()
-
-    username = username.strip().lower()
     connections[username] = ws
     await send_users()
 
     try:
         while True:
-            data = await ws.receive_json()  # 👈 ТОЛЬКО JSON
+            data = await ws.receive_json()
 
             if data.get("type") == "message":
-                to_user = data.get("to")
-                if to_user in connections:
-                    await connections[to_user].send_json({
+                to = data.get("to")
+                if to in connections:
+                    await connections[to].send_json({
                         "type": "message",
                         "from": username,
                         "text": data.get("text")
@@ -38,4 +43,3 @@ async def websocket_endpoint(ws: WebSocket, username: str):
     except WebSocketDisconnect:
         connections.pop(username, None)
         await send_users()
-

@@ -3,116 +3,63 @@
 <head>
 <meta charset="UTF-8">
 <title>Simple Messenger</title>
-
 <style>
-body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    display: flex;
-    height: 100vh;
-}
-
-#users {
-    width: 220px;
-    border-right: 1px solid #ccc;
-    padding: 10px;
-    overflow-y: auto;
-}
-
-.user {
-    padding: 6px;
-    cursor: pointer;
-}
-
-.user:hover {
-    background: #eee;
-}
-
-.user.active {
-    background: #ddd;
-    font-weight: bold;
-}
-
-#chat {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-#messages {
-    flex: 1;
-    padding: 10px;
-    overflow-y: auto;
-}
-
-#input {
-    display: flex;
-    border-top: 1px solid #ccc;
-}
-
-#input input {
-    flex: 1;
-    padding: 10px;
-}
-
-#input button {
-    padding: 10px;
-}
+body{margin:0;font-family:Arial;display:flex;height:100vh}
+#users{width:200px;border-right:1px solid #ccc;padding:10px}
+.user{padding:5px;cursor:pointer}
+.user.active{background:#ddd;font-weight:bold}
+#chat{flex:1;display:flex;flex-direction:column}
+#messages{flex:1;padding:10px;overflow-y:auto}
+#input{display:flex;border-top:1px solid #ccc}
+#input input{flex:1;padding:10px}
+#input button{padding:10px}
 </style>
 </head>
 
 <body>
-
 <div id="users"></div>
 
 <div id="chat">
-    <div id="messages"></div>
-    <div id="input">
-        <input id="msg" placeholder="Сообщение">
-        <button onclick="sendMessage()">Отправить</button>
-    </div>
+  <div id="messages"></div>
+  <div id="input">
+    <input id="msg" placeholder="Сообщение">
+    <button onclick="sendMessage()">Отправить</button>
+  </div>
 </div>
 
 <script>
-/* ====== НАСТРОЙКИ ====== */
-const username = prompt("Введи ник").trim().toLowerCase();
+const username = prompt("Ник").trim();
 const ws = new WebSocket(`wss://${location.host}/ws/${username}`);
 
-/* ====== СОСТОЯНИЕ ====== */
 let selectedUser = null;
 
-/* ====== DOM ====== */
 const usersDiv = document.getElementById("users");
 const messagesDiv = document.getElementById("messages");
 const msgInput = document.getElementById("msg");
 
-/* ====== ШИФРОВАНИЕ (упрощено, можно заменить на AES) ====== */
-function encrypt(text) {
-    return btoa(text);
-}
-function decrypt(text) {
-    return atob(text);
-}
+const encrypt = t => btoa(t);
+const decrypt = t => atob(t);
 
-/* ====== WEBSOCKET ====== */
-ws.onopen = () => {
-    console.log("WS connected");
-};
-
-ws.onmessage = (e) => {
-    console.log("RAW WS:", e.data);
-
+ws.onmessage = e => {
     let data;
-    try {
-        data = JSON.parse(e.data);
-    } catch (err) {
-        console.warn("NOT JSON FROM SERVER:", e.data);
-        return; // 💪 защита, клиент не падает
-    }
+    try { data = JSON.parse(e.data); }
+    catch { return; }
 
     if (data.type === "users") {
-        renderUsers(data.users);
-        return;
+        usersDiv.innerHTML = "";
+        data.users.forEach(u => {
+            if (u === username) return;
+            const d = document.createElement("div");
+            d.textContent = u;
+            d.className = "user";
+            d.onclick = () => {
+                selectedUser = u;
+                document.querySelectorAll(".user")
+                    .forEach(x => x.classList.remove("active"));
+                d.classList.add("active");
+            };
+            usersDiv.appendChild(d);
+        });
     }
 
     if (data.type === "message") {
@@ -120,58 +67,27 @@ ws.onmessage = (e) => {
     }
 };
 
-ws.onclose = () => {
-    console.log("WS closed");
-};
-
-/* ====== UI ====== */
-function renderUsers(users) {
-    usersDiv.innerHTML = "";
-
-    users.forEach(u => {
-        if (u === username) return;
-
-        const div = document.createElement("div");
-        div.textContent = u;
-        div.className = "user";
-
-        div.onclick = () => {
-            selectedUser = u;
-            document.querySelectorAll(".user")
-                .forEach(el => el.classList.remove("active"));
-            div.classList.add("active");
-        };
-
-        usersDiv.appendChild(div);
-    });
-}
-
-function sendMessage() {
-    if (!selectedUser) {
-        alert("Выбери пользователя");
-        return;
-    }
-
+function sendMessage(){
+    if(!selectedUser) return alert("Выбери пользователя");
     const text = msgInput.value.trim();
-    if (!text) return;
+    if(!text) return;
 
     ws.send(JSON.stringify({
-        type: "message",
-        to: selectedUser,
+        type:"message",
+        to:selectedUser,
         text: encrypt(text)
     }));
 
     addMessage("Я: " + text);
-    msgInput.value = "";
+    msgInput.value="";
 }
 
-function addMessage(text) {
-    const div = document.createElement("div");
-    div.textContent = text;
-    messagesDiv.appendChild(div);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+function addMessage(t){
+    const d=document.createElement("div");
+    d.textContent=t;
+    messagesDiv.appendChild(d);
+    messagesDiv.scrollTop=messagesDiv.scrollHeight;
 }
 </script>
-
 </body>
 </html>
