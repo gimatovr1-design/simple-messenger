@@ -5,154 +5,172 @@
 <title>Simple Messenger</title>
 
 <style>
-* { box-sizing: border-box; }
-
 body {
     margin: 0;
-    height: 100vh;
-    background: radial-gradient(circle at top, #1b1f3b, #0b0d1a);
-    font-family: 'Segoe UI', sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    font-family: Arial;
+    background: #0f0f0f;
     color: white;
 }
 
+#login {
+    display: flex;
+    height: 100vh;
+    align-items: center;
+    justify-content: center;
+}
+
 #chat {
-    width: 380px;
-    height: 560px;
-    background: rgba(255,255,255,0.08);
-    backdrop-filter: blur(14px);
-    border-radius: 18px;
-    padding: 14px;
+    display: none;
+    height: 100vh;
+}
+
+#users {
+    width: 200px;
+    background: #1c1c1c;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+#users div {
+    padding: 6px;
+    cursor: pointer;
+}
+
+#users div:hover {
+    background: #333;
+}
+
+#main {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 0 40px rgba(0,0,0,0.6);
 }
 
 #messages {
     flex: 1;
+    padding: 10px;
     overflow-y: auto;
+}
+
+#input {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.msg {
-    max-width: 75%;
-    padding: 8px 12px;
-    border-radius: 12px;
-    word-wrap: break-word;
-}
-
-.msg.me {
-    align-self: flex-end;
-    background: linear-gradient(135deg, #4a6cff, #6c8bff);
-    text-align: right;
-}
-
-.msg.other {
-    align-self: flex-start;
-    background: rgba(255,255,255,0.15);
-}
-
-.row {
-    display: flex;
-    gap: 6px;
-    margin-top: 6px;
 }
 
 input {
     flex: 1;
-    background: rgba(0,0,0,0.35);
-    border: none;
-    border-radius: 10px;
     padding: 10px;
-    color: white;
-    outline: none;
+    border: none;
 }
 
 button {
-    background: linear-gradient(135deg, #4a6cff, #6c8bff);
-    border: none;
-    border-radius: 10px;
-    padding: 10px 14px;
-    color: white;
-    cursor: pointer;
+    padding: 10px;
 }
 </style>
 </head>
-
 <body>
 
+<!-- LOGIN -->
+<div id="login">
+    <input id="username" placeholder="Логин">
+    <button onclick="login()">Войти</button>
+</div>
+
+<!-- CHAT -->
 <div id="chat">
+    <div id="users"></div>
 
-    <div class="row">
-        <input id="nick" placeholder="Введите ник">
-        <button onclick="setNick()">OK</button>
+    <div id="main">
+        <div id="messages"></div>
+        <div id="input">
+            <input id="text" placeholder="Сообщение">
+            <button onclick="send()">Отправить</button>
+        </div>
     </div>
-
-    <div id="messages"></div>
-
-    <div class="row">
-        <input id="text" placeholder="Сообщение"
-               onkeydown="if(event.key==='Enter') sendMessage()">
-        <button onclick="sendMessage()">➤</button>
-    </div>
-
 </div>
 
 <script>
-const protocol = location.protocol === "https:" ? "wss" : "ws";
-const ws = new WebSocket(`${protocol}://${location.host}/ws`);
+let ws;
+let myName;
+let mode = "public";
+let privateWith = null;
 
-let myNick = "";
+function login() {
+    myName = username.value.trim();
+    if (!myName) return;
 
-ws.onmessage = (e) => {
-    let data;
-    try {
-        data = JSON.parse(e.data);
-    } catch {
-        return;
-    }
+    ws = new WebSocket(`ws://${location.host}/ws`);
 
-    const messages = document.getElementById("messages");
-    const msg = document.createElement("div");
+    ws.onopen = () => {
+        ws.send(JSON.stringify({
+            type: "login",
+            username: myName
+        }));
 
-    if (data.type === "system") {
-        msg.className = "msg other";
-        msg.textContent = data.text;
-    }
+        login.style.display = "none";
+        chat.style.display = "flex";
+    };
 
-    if (data.type === "message") {
-        if (data.nick === myNick) {
-            msg.className = "msg me";
-            msg.textContent = data.text;
-        } else {
-            msg.className = "msg other";
-            msg.textContent = data.nick + ": " + data.text;
+    ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+
+        if (data.type === "users") {
+            users.innerHTML = "<b>Онлайн</b><br>";
+            data.users.forEach(u => {
+                if (u !== myName) {
+                    const div = document.createElement("div");
+                    div.textContent = u;
+                    div.onclick = () => openPrivate(u);
+                    users.appendChild(div);
+                }
+            });
         }
-    }
 
-    messages.appendChild(msg);
-    msg.scrollIntoView({ behavior: "smooth" });
-};
+        if (data.type === "public") {
+            add(`${data.from}: ${data.text}`);
+        }
 
-function setNick() {
-    const nick = document.getElementById("nick").value.trim();
-    if (!nick) return;
-    myNick = nick;
-    ws.send("/nick " + nick);
+        if (data.type === "private") {
+            add(`🔒 ${data.from}: ${data.text}`);
+        }
+    };
 }
 
-function sendMessage() {
-    const input = document.getElementById("text");
-    const text = input.value.trim();
+function openPrivate(user) {
+    mode = "private";
+    privateWith = user;
+    add(`🔒 Приватный чат с ${user}`);
+}
+
+function send() {
+    const text = document.getElementById("text").value;
     if (!text) return;
-    ws.send(text);
-    input.value = "";
+
+    if (mode === "public") {
+        ws.send(JSON.stringify({
+            type: "message",
+            mode: "public",
+            text
+        }));
+    } else {
+        ws.send(JSON.stringify({
+            type: "message",
+            mode: "private",
+            to: privateWith,
+            text
+        }));
+    }
+
+    document.getElementById("text").value = "";
+}
+
+function add(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
 }
 </script>
 
 </body>
 </html>
+
