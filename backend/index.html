@@ -18,6 +18,7 @@ body {
     color: white;
 }
 
+/* ===== контейнер чата ===== */
 #chat {
     width: 380px;
     height: 560px;
@@ -30,26 +31,44 @@ body {
     box-shadow: 0 0 40px rgba(0,0,0,0.6);
 }
 
+/* ===== сообщения ===== */
 #messages {
     flex: 1;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     padding-right: 4px;
 }
 
 .msg {
-    background: rgba(255,255,255,0.12);
+    max-width: 75%;
     padding: 8px 12px;
     border-radius: 12px;
-    margin-bottom: 6px;
     animation: fade 0.2s ease;
     word-wrap: break-word;
 }
 
+/* свои сообщения */
+.msg.me {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #4a6cff, #6c8bff);
+    text-align: right;
+}
+
+/* чужие сообщения */
+.msg.other {
+    align-self: flex-start;
+    background: rgba(255,255,255,0.15);
+}
+
+/* анимация */
 @keyframes fade {
     from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ===== панели ===== */
 .row {
     display: flex;
     gap: 6px;
@@ -77,7 +96,6 @@ button {
     padding: 10px 14px;
     color: white;
     cursor: pointer;
-    pointer-events: auto;
 }
 </style>
 </head>
@@ -86,13 +104,16 @@ button {
 
 <div id="chat">
 
+    <!-- ник -->
     <div class="row">
         <input id="nick" placeholder="Введите ник">
         <button type="button" onclick="setNick()">OK</button>
     </div>
 
+    <!-- сообщения -->
     <div id="messages"></div>
 
+    <!-- ввод -->
     <div class="row">
         <input id="text" placeholder="Сообщение"
                onkeydown="if(event.key==='Enter') sendMessage()">
@@ -105,20 +126,35 @@ button {
 const protocol = location.protocol === "https:" ? "wss" : "ws";
 const ws = new WebSocket(`${protocol}://${location.host}/ws`);
 
+let myNick = "";
+
+// получение сообщений
 ws.onmessage = (e) => {
-    const div = document.createElement("div");
-    div.className = "msg";
-    div.textContent = e.data;
-    document.getElementById("messages").appendChild(div);
-    div.scrollIntoView({behavior: "smooth"});
+    const text = e.data;
+    const msg = document.createElement("div");
+    msg.classList.add("msg");
+
+    if (myNick && text.startsWith(myNick + ":")) {
+        msg.classList.add("me");
+        msg.textContent = text.replace(myNick + ":", "").trim();
+    } else {
+        msg.classList.add("other");
+        msg.textContent = text;
+    }
+
+    document.getElementById("messages").appendChild(msg);
+    msg.scrollIntoView({ behavior: "smooth" });
 };
 
+// установка ника
 function setNick() {
     const nick = document.getElementById("nick").value.trim();
     if (!nick) return;
+    myNick = nick;
     ws.send("/nick " + nick);
 }
 
+// отправка сообщения
 function sendMessage() {
     const input = document.getElementById("text");
     const text = input.value.trim();
