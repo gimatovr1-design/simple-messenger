@@ -4,6 +4,7 @@ import uvicorn
 
 app = FastAPI()
 
+
 @app.get("/")
 async def root():
     return FileResponse("index.html")
@@ -39,19 +40,30 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
+            data = data.strip()
 
-            # команда смены ника
-            if data.startswith("/nick "):
-                nick = data.replace("/nick ", "").strip()
-                manager.active[websocket] = nick
-                await websocket.send_text(f"🔧 Ник установлен: {nick}")
+            # игнор пустых сообщений
+            if not data:
                 continue
 
+            # установка ника
+            if data.startswith("/nick "):
+                nick = data.replace("/nick ", "").strip()
+                if not nick:
+                    await websocket.send_text("❌ Ник не может быть пустым")
+                    continue
+
+                manager.active[websocket] = nick
+                await websocket.send_text(f"✅ Ник установлен: {nick}")
+                continue
+
+            # проверка ника
             nick = manager.active.get(websocket, "")
             if not nick:
                 await websocket.send_text("❌ Сначала укажи ник")
                 continue
 
+            # рассылка сообщения
             await manager.broadcast(f"{nick}: {data}")
 
     except WebSocketDisconnect:
