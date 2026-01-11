@@ -89,7 +89,12 @@ body {
 </div>
 
 <script>
-const nickname = prompt("Введите ник:");
+let nickname = localStorage.getItem("nickname");
+
+if (!nickname) {
+    nickname = prompt("Введите ник:");
+    localStorage.setItem("nickname", nickname);
+}
 const protocol = location.protocol === "https:" ? "wss" : "ws";
 const ws = new WebSocket(`${protocol}://${location.host}/ws`);
 
