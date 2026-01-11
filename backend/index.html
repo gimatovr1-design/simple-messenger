@@ -10,28 +10,32 @@
 body {
     margin: 0;
     height: 100vh;
-    background: radial-gradient(circle at top, #020617, #000);
+    background:
+        radial-gradient(circle at 20% 10%, #1e293b, transparent 40%),
+        radial-gradient(circle at 80% 90%, #020617, transparent 40%),
+        linear-gradient(180deg, #020617, #000);
     display: flex;
     justify-content: center;
     align-items: center;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: Inter, system-ui, sans-serif;
     color: #e5e7eb;
 }
 
 .chat {
     width: 420px;
-    height: 600px;
-    background: rgba(15,23,42,.9);
-    backdrop-filter: blur(16px);
-    border-radius: 22px;
-    box-shadow: 0 25px 70px rgba(0,0,0,.6);
+    height: 640px;
+    background: rgba(15,23,42,.85);
+    backdrop-filter: blur(22px);
+    border-radius: 26px;
+    box-shadow: 0 30px 90px rgba(0,0,0,.7);
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
 
+/* ---------- HEADER ---------- */
 .header {
-    padding: 14px 16px;
+    padding: 16px 18px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -40,13 +44,13 @@ body {
 
 .title {
     font-weight: 600;
-    font-size: 15px;
+    font-size: 16px;
 }
 
 .status {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     font-size: 13px;
     opacity: .9;
 }
@@ -60,68 +64,97 @@ body {
 
 #statusDot.online { background: #22c55e; }
 
-button {
-    background: rgba(255,255,255,.1);
+.header button {
+    background: rgba(255,255,255,.08);
     border: none;
     color: #e5e7eb;
     padding: 6px 12px;
-    border-radius: 10px;
+    border-radius: 12px;
     cursor: pointer;
+    transition: background .2s;
 }
 
-button:hover { background: rgba(255,255,255,.18); }
+.header button:hover {
+    background: rgba(255,255,255,.16);
+}
 
+/* ---------- MESSAGES ---------- */
 #messages {
     flex: 1;
-    padding: 14px;
+    padding: 18px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
 }
 
 .msg {
     max-width: 75%;
-    padding: 9px 13px;
-    border-radius: 14px;
+    padding: 10px 14px;
+    border-radius: 18px;
     font-size: 14px;
-    line-height: 1.3;
-    animation: fade .15s ease;
+    line-height: 1.35;
+    animation: pop .2s ease;
+    word-wrap: break-word;
 }
 
 .msg.other {
-    background: rgba(255,255,255,.1);
+    background: rgba(255,255,255,.12);
     align-self: flex-start;
+    border-bottom-left-radius: 6px;
 }
 
 .msg.me {
     background: linear-gradient(135deg, #2563eb, #3b82f6);
     align-self: flex-end;
+    border-bottom-right-radius: 6px;
 }
 
-@keyframes fade {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
+@keyframes pop {
+    from { opacity: 0; transform: translateY(6px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* ---------- INPUT ---------- */
 .input {
-    padding: 12px;
+    padding: 14px;
     display: flex;
-    gap: 8px;
+    gap: 10px;
     border-top: 1px solid rgba(255,255,255,.08);
+    background: rgba(2,6,23,.6);
 }
 
 input {
     flex: 1;
-    background: rgba(255,255,255,.08);
+    background: rgba(255,255,255,.1);
     border: none;
     outline: none;
-    padding: 10px 14px;
-    border-radius: 14px;
+    padding: 12px 16px;
+    border-radius: 18px;
     color: #e5e7eb;
+    font-size: 14px;
 }
 
-input::placeholder { color: #94a3b8; }
+input::placeholder {
+    color: #94a3b8;
+}
+
+#sendBtn {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    color: white;
+    font-size: 18px;
+    transition: transform .15s, box-shadow .15s;
+}
+
+#sendBtn:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 18px rgba(59,130,246,.6);
+}
 </style>
 </head>
 
@@ -143,36 +176,33 @@ input::placeholder { color: #94a3b8; }
     <div id="messages"></div>
 
     <div class="input">
-        <input id="messageInput" placeholder="Напиши сообщение..." autocomplete="off">
+        <input id="messageInput" placeholder="Сообщение..." autocomplete="off">
         <button id="sendBtn">➤</button>
     </div>
 
 </div>
 
 <script>
-/* ---------- НИК (БЕЗ null) ---------- */
 let nickname = localStorage.getItem("nickname");
 
 if (!nickname || nickname === "null") {
     nickname = prompt("Введите ник:");
-
     if (!nickname || !nickname.trim()) {
         nickname = "Guest" + Math.floor(Math.random() * 1000);
     }
-
     localStorage.setItem("nickname", nickname);
 }
 
-/* ---------- DOM ---------- */
 const messages = document.getElementById("messages");
 const input = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
 const statusDot = document.getElementById("statusDot");
 const statusText = document.getElementById("statusText");
 
+input.focus();
+
 let ws;
 
-/* ---------- WS ---------- */
 function connect() {
     const protocol = location.protocol === "https:" ? "wss" : "ws";
     ws = new WebSocket(`${protocol}://${location.host}/ws`);
@@ -201,7 +231,6 @@ function connect() {
 
 connect();
 
-/* ---------- SEND ---------- */
 function sendMessage() {
     if (!input.value.trim()) return;
     ws.send(nickname + ": " + input.value);
@@ -210,21 +239,15 @@ function sendMessage() {
 
 sendBtn.onclick = sendMessage;
 
-/* ✅ ИСПРАВЛЕНИЕ: ввод больше не блокируется */
 input.addEventListener("keydown", e => {
-    if (e.key === "Enter") {
-        sendMessage();
-    }
+    if (e.key === "Enter") sendMessage();
 });
 
-/* ---------- CHANGE NICK ---------- */
 document.getElementById("changeNick").onclick = () => {
     const newNick = prompt("Новый ник:");
     if (!newNick || !newNick.trim()) return;
-
     localStorage.setItem("nickname", newNick);
     nickname = newNick;
-
     ws.close();
     connect();
 };
