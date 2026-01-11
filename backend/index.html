@@ -108,20 +108,19 @@ body {
         <div id="messages-private" class="messages" style="display:none;"></div>
 
         <div id="input">
-            <input id="text" placeholder="Сообщение">
+            <input id="text" placeholder="Сообщение" onkeydown="handleEnter(event)">
             <button id="sendBtn">Отправить</button>
         </div>
     </div>
 </div>
 
 <script>
-/* ===== STATE ===== */
 let ws = null;
 let myName = "";
 let mode = "public";
 let privateWith = null;
 
-/* ===== ELEMENTS ===== */
+/* elements */
 const loginDiv = document.getElementById("login");
 const chatDiv = document.getElementById("chat");
 const usersDiv = document.getElementById("users");
@@ -132,7 +131,7 @@ const tabPrivate = document.getElementById("tab-private");
 const msgPublic = document.getElementById("messages-public");
 const msgPrivate = document.getElementById("messages-private");
 
-/* ===== LOGIN ===== */
+/* LOGIN */
 document.getElementById("loginBtn").onclick = () => {
     myName = document.getElementById("username").value.trim();
     if (!myName) return;
@@ -174,13 +173,9 @@ document.getElementById("loginBtn").onclick = () => {
             addPrivate(`🔒 ${data.from}: ${data.text}`);
         }
     };
-
-    ws.onerror = () => {
-        alert("Ошибка подключения WebSocket");
-    };
 };
 
-/* ===== TABS ===== */
+/* TABS */
 tabPublic.onclick = openPublic;
 tabPrivate.onclick = openPrivateTab;
 
@@ -200,15 +195,22 @@ function openPrivateTab() {
     tabPublic.classList.remove("active");
 }
 
-/* ===== PRIVATE CHAT ===== */
+/* PRIVATE CHAT */
 function openPrivate(user) {
     privateWith = user;
     openPrivateTab();
     addPrivate(`🔒 Чат с ${user}`);
 }
 
-/* ===== SEND ===== */
+/* SEND */
 document.getElementById("sendBtn").onclick = send;
+
+function handleEnter(e) {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        send();
+    }
+}
 
 function send() {
     const input = document.getElementById("text");
@@ -233,7 +235,7 @@ function send() {
     input.value = "";
 }
 
-/* ===== ADD MESSAGE ===== */
+/* ADD MESSAGE */
 function addPublic(text) {
     const div = document.createElement("div");
     div.textContent = text;
@@ -251,3 +253,4 @@ function addPrivate(text) {
 
 </body>
 </html>
+
