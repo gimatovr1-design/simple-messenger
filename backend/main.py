@@ -1,45 +1,35 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from ws_manager import ConnectionManager
 
 app = FastAPI()
+manager = ConnectionManager()
 
-connections = {}  # username -> websocket
+# Статика (index.html + favicon.ico)
+app.mount("/static", StaticFiles(directory="."), name="static")
 
 
 @app.get("/")
-async def index():
-    with open("index.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+async def get_index():
+    return FileResponse("index.html")
 
 
-async def send_users():
-    users = list(connections.keys())
-    for ws in connections.values():
-        await ws.send_json({
-            "type": "users",
-            "users": users
-        })
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse("favicon.ico")
 
 
 @app.websocket("/ws/{username}")
 async def websocket_endpoint(ws: WebSocket, username: str):
-    await ws.accept()
-    connections[username] = ws
-    await send_users()
-
+    await manager.connect(ws, username)
     try:
         while True:
             data = await ws.receive_json()
-
-            if data.get("type") == "message":
-                to = data.get("to")
-                if to in connections:
-                    await connections[to].send_json({
-                        "type": "message",
-                        "from": username,
-                        "text": data.get("text")
-                    })
-
+            await manager.send_private(
+                sender=username,
+                recipient=data["to"],
+                message=data["message"]
+            )
     except WebSocketDisconnect:
-        connections.pop(username, None)
-        await send_users()
+        manager.disconnect(username)

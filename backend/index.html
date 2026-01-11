@@ -1,93 +1,86 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Simple Messenger</title>
-<style>
-body{margin:0;font-family:Arial;display:flex;height:100vh}
-#users{width:200px;border-right:1px solid #ccc;padding:10px}
-.user{padding:5px;cursor:pointer}
-.user.active{background:#ddd;font-weight:bold}
-#chat{flex:1;display:flex;flex-direction:column}
-#messages{flex:1;padding:10px;overflow-y:auto}
-#input{display:flex;border-top:1px solid #ccc}
-#input input{flex:1;padding:10px}
-#input button{padding:10px}
-</style>
+    <meta charset="UTF-8">
+    <title>Simple Messenger</title>
+    <link rel="icon" href="/favicon.ico">
+    <style>
+        body {
+            background: #0f172a;
+            color: #e5e7eb;
+            font-family: Arial, sans-serif;
+            display: flex;
+            height: 100vh;
+            margin: 0;
+        }
+        #users {
+            width: 200px;
+            border-right: 1px solid #334155;
+            padding: 10px;
+        }
+        #chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #messages {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+        }
+        input, button {
+            padding: 8px;
+            background: #020617;
+            color: white;
+            border: 1px solid #334155;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+    </style>
 </head>
-
 <body>
+
 <div id="users"></div>
 
 <div id="chat">
-  <div id="messages"></div>
-  <div id="input">
-    <input id="msg" placeholder="Сообщение">
-    <button onclick="sendMessage()">Отправить</button>
-  </div>
+    <div id="messages"></div>
+    <div style="display:flex;">
+        <input id="to" placeholder="Кому">
+        <input id="message" placeholder="Сообщение" style="flex:1;">
+        <button onclick="sendMessage()">▶</button>
+    </div>
 </div>
 
 <script>
-const username = prompt("Ник").trim();
-const ws = new WebSocket(`wss://${location.host}/ws/${username}`);
+    const username = prompt("Ваш ник:");
+    const ws = new WebSocket(`wss://${location.host}/ws/${username}`);
 
-let selectedUser = null;
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
 
-const usersDiv = document.getElementById("users");
-const messagesDiv = document.getElementById("messages");
-const msgInput = document.getElementById("msg");
+        if (data.type === "users") {
+            document.getElementById("users").innerHTML =
+                "<b>Пользователи</b><br>" + data.users.join("<br>");
+        } else {
+            addMessage(`${data.from}: ${data.message}`);
+        }
+    };
 
-const encrypt = t => btoa(t);
-const decrypt = t => atob(t);
-
-ws.onmessage = e => {
-    let data;
-    try { data = JSON.parse(e.data); }
-    catch { return; }
-
-    if (data.type === "users") {
-        usersDiv.innerHTML = "";
-        data.users.forEach(u => {
-            if (u === username) return;
-            const d = document.createElement("div");
-            d.textContent = u;
-            d.className = "user";
-            d.onclick = () => {
-                selectedUser = u;
-                document.querySelectorAll(".user")
-                    .forEach(x => x.classList.remove("active"));
-                d.classList.add("active");
-            };
-            usersDiv.appendChild(d);
-        });
+    function sendMessage() {
+        ws.send(JSON.stringify({
+            to: document.getElementById("to").value,
+            message: document.getElementById("message").value
+        }));
+        document.getElementById("message").value = "";
     }
 
-    if (data.type === "message") {
-        addMessage(data.from + ": " + decrypt(data.text));
+    function addMessage(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        document.getElementById("messages").appendChild(div);
     }
-};
-
-function sendMessage(){
-    if(!selectedUser) return alert("Выбери пользователя");
-    const text = msgInput.value.trim();
-    if(!text) return;
-
-    ws.send(JSON.stringify({
-        type:"message",
-        to:selectedUser,
-        text: encrypt(text)
-    }));
-
-    addMessage("Я: " + text);
-    msgInput.value="";
-}
-
-function addMessage(t){
-    const d=document.createElement("div");
-    d.textContent=t;
-    messagesDiv.appendChild(d);
-    messagesDiv.scrollTop=messagesDiv.scrollHeight;
-}
 </script>
+
 </body>
 </html>
