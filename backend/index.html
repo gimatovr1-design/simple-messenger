@@ -76,6 +76,9 @@ input {
     font-size: 14px;
     border: none;
     outline: none;
+    color: #fff;
+    background: #000;
+    caret-color: #fff;
 }
 
 button {
@@ -99,7 +102,7 @@ button {
     <div id="status">🔴 offline</div>
 </header>
 
-<div id="notify">⚠️ Соединение потеряно</div>
+<div id="notify">⚠ Соединение потеряно</div>
 <div id="messages"></div>
 
 <footer>
@@ -120,6 +123,10 @@ const messages = document.getElementById("messages");
 const notify = document.getElementById("notify");
 const nickEl = document.getElementById("nickname");
 const changeNickBtn = document.getElementById("changeNick");
+
+/* === INPUT: ЖЁСТКО ВКЛЮЧЁН === */
+input.disabled = false;
+input.readOnly = false;
 
 /* === NICK (SESSION ONLY) === */
 let nickname = "Гость";
@@ -161,8 +168,7 @@ function addMessage(text, cls = "") {
 function setOnline(state) {
     statusEl.textContent = state ? "🟢 online" : "🔴 offline";
     notify.style.display = state ? "none" : "block";
-    input.disabled = !state;
-    sendBtn.disabled = !state;
+    sendBtn.disabled = !state; // ВАЖНО: блокируем ТОЛЬКО кнопку
     if (state) input.focus();
 }
 
@@ -175,7 +181,7 @@ function connect() {
     ws.onopen = () => {
         setOnline(true);
         addMessage("Соединение установлено", "system");
-        clearTimeout(reconnectTimer);
+        if (reconnectTimer) clearTimeout(reconnectTimer);
     };
 
     ws.onmessage = e => addMessage(e.data);
@@ -184,6 +190,10 @@ function connect() {
         setOnline(false);
         addMessage("Переподключение...", "system");
         reconnectTimer = setTimeout(connect, 2000);
+    };
+
+    ws.onerror = () => {
+        ws.close();
     };
 }
 
@@ -203,7 +213,9 @@ function sendMessage() {
 }
 
 sendBtn.onclick = sendMessage;
-input.onkeydown = e => e.key === "Enter" && sendMessage();
+input.addEventListener("keydown", e => {
+    if (e.key === "Enter") sendMessage();
+});
 
 connect();
 </script>
