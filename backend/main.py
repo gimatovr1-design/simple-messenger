@@ -4,8 +4,6 @@ import uvicorn
 
 app = FastAPI()
 
-
-# ===== HTTP: отдаём чат =====
 @app.get("/")
 async def root():
     return FileResponse("index.html")
@@ -15,15 +13,16 @@ class ConnectionManager:
     def __init__(self):
         self.active: dict[WebSocket, str] = {}
 
-    async def connect(self, ws: WebSocket):
-        await ws.accept()
-        self.active[ws] = "Гость"
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active[websocket] = ""
 
-    def disconnect(self, ws: WebSocket):
-        self.active.pop(ws, None)
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active:
+            del self.active[websocket]
 
     async def broadcast(self, message: str):
-        for ws in list(self.active.keys()):
+        for ws in list(self.active):
             try:
                 await ws.send_text(message)
             except:
@@ -34,36 +33,29 @@ manager = ConnectionManager()
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
-    await manager.connect(ws)
-
-    await ws.send_text(
-        "👋 Добро пожаловать в чат!\n\n"
-        "💬 Пиши сообщения — их увидят все\n"
-        "👤 Сменить ник: /nick ИМЯ\n\n"
-        "Приятного общения ✨"
-    )
-
-    await manager.broadcast(f"{manager.active[ws]} подключился")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
 
     try:
         while True:
-            text = await ws.receive_text()
+            data = await websocket.receive_text()
 
-            if text.startswith("/nick "):
-                new_nick = text.replace("/nick ", "", 1).strip()
-                if new_nick:
-                    old = manager.active[ws]
-                    manager.active[ws] = new_nick
-                    await manager.broadcast(f"{old} сменил ник на {new_nick}")
+            # команда смены ника
+            if data.startswith("/nick "):
+                nick = data.replace("/nick ", "").strip()
+                manager.active[websocket] = nick
+                await websocket.send_text(f"🔧 Ник установлен: {nick}")
                 continue
 
-            await manager.broadcast(f"{manager.active[ws]}: {text}")
+            nick = manager.active.get(websocket, "")
+            if not nick:
+                await websocket.send_text("❌ Сначала укажи ник")
+                continue
+
+            await manager.broadcast(f"{nick}: {data}")
 
     except WebSocketDisconnect:
-        username = manager.active.get(ws, "Гость")
-        manager.disconnect(ws)
-        await manager.broadcast(f"{username} отключился")
+        manager.disconnect(websocket)
 
 
 if __name__ == "__main__":
