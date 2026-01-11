@@ -1,58 +1,50 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from pathlib import Path
-from ws_manager import ConnectionManager
 
 app = FastAPI()
-manager = ConnectionManager()
-
-# онлайн пользователи
-online_users = set()
 
 HTML_FILE = Path(__file__).parent / "index.html"
 
+online_users = set()
+connections = []
 
 @app.get("/")
-async def root():
+async def get():
     return HTMLResponse(HTML_FILE.read_text(encoding="utf-8"))
 
-
 @app.websocket("/ws/chat")
-async def websocket_chat(websocket: WebSocket):
-    await manager.connect(websocket)
-
+async def websocket_endpoint(ws: WebSocket):
+    await ws.accept()
+    connections.append(ws)
     username = None
 
     try:
-        # первый пакет — ник пользователя
-        data = await websocket.receive_json()
-        username = data.get("user", "anonymous")
-        online_users.add(username)
-
-        # сообщаем всем, что пользователь зашёл
-        await manager.broadcast_json({
-            "type": "join",
-            "user": username,
-            "online": list(online_users)
-        })
-
         while True:
-            data = await websocket.receive_json()
+            data = await ws.receive_text()
 
-            await manager.broadcast_json({
-                "type": "message",
-                "user": username,
-                "text": data.get("text", "")
-            })
+            # первое сообщение — ник
+            if data.startswith("__join__"):
+                username = data.replace("__join__", "")
+                online_users.add(username)
+                await broadcast_users()
+                await broadcast(f"🟢 {username} вошёл в чат")
+                continue
+
+            await broadcast(data)
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
-
+        connections.remove(ws)
         if username:
             online_users.discard(username)
+            await broadcast_users()
+            await broadcast(f"🔴 {username} вышел из чата")
 
-            await manager.broadcast_json({
-                "type": "leave",
-                "user": username,
-                "online": list(online_users)
-            })
+async def broadcast(message: str):
+    for ws in connections:
+        await ws.send_text(message)
+
+async def broadcast_users():
+    users = ", ".join(sorted(online_users))
+    for ws in connections:
+        await ws.send_text(f"__users__{users}")
