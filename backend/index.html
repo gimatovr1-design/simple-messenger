@@ -5,163 +5,107 @@
 <title>Simple Messenger</title>
 
 <style>
-* { box-sizing: border-box; }
-
 body {
-    margin: 0;
-    height: 100vh;
-    background: radial-gradient(circle at top, #1b1f3b, #0b0d1a);
-    font-family: 'Segoe UI', sans-serif;
+    background: #111;
+    color: #fff;
+    font-family: Arial, sans-serif;
     display: flex;
     justify-content: center;
-    align-items: center;
-    color: white;
+    margin-top: 40px;
 }
-
-/* ===== контейнер чата ===== */
 #chat {
-    width: 380px;
-    height: 560px;
-    background: rgba(255,255,255,0.08);
-    backdrop-filter: blur(14px);
-    border-radius: 18px;
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 0 40px rgba(0,0,0,0.6);
+    width: 360px;
 }
-
-/* ===== сообщения ===== */
 #messages {
-    flex: 1;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding-right: 4px;
-}
-
-.msg {
-    max-width: 75%;
-    padding: 8px 12px;
-    border-radius: 12px;
-    animation: fade 0.2s ease;
-    word-wrap: break-word;
-}
-
-/* свои сообщения */
-.msg.me {
-    align-self: flex-end;
-    background: linear-gradient(135deg, #4a6cff, #6c8bff);
-    text-align: right;
-}
-
-/* чужие сообщения */
-.msg.other {
-    align-self: flex-start;
-    background: rgba(255,255,255,0.15);
-}
-
-/* анимация */
-@keyframes fade {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-/* ===== панели ===== */
-.row {
-    display: flex;
-    gap: 6px;
-    margin-top: 6px;
-}
-
-input {
-    flex: 1;
-    background: rgba(0,0,0,0.35);
-    border: none;
-    border-radius: 10px;
+    height: 300px;
+    border: 1px solid #333;
     padding: 10px;
-    color: white;
-    outline: none;
+    overflow-y: auto;
+    margin-bottom: 10px;
 }
-
-input::placeholder {
+input, button {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+}
+#clearBtn {
+    display: none;
+    background: #b00020;
+    color: white;
+}
+.system {
     color: #aaa;
-}
-
-button {
-    background: linear-gradient(135deg, #4a6cff, #6c8bff);
-    border: none;
-    border-radius: 10px;
-    padding: 10px 14px;
-    color: white;
-    cursor: pointer;
+    font-style: italic;
 }
 </style>
 </head>
-
 <body>
 
 <div id="chat">
-
-    <!-- ник -->
-    <div class="row">
-        <input id="nick" placeholder="Введите ник">
-        <button type="button" onclick="setNick()">OK</button>
-    </div>
-
-    <!-- сообщения -->
     <div id="messages"></div>
 
-    <!-- ввод -->
-    <div class="row">
-        <input id="text" placeholder="Сообщение"
-               onkeydown="if(event.key==='Enter') sendMessage()">
-        <button type="button" onclick="sendMessage()">➤</button>
-    </div>
+    <input id="nick" placeholder="Ник (руслан для доступа)" />
+    <button onclick="setNick()">Сменить ник</button>
 
+    <input id="text" placeholder="Сообщение" />
+    <button onclick="sendMessage()">Отправить</button>
+
+    <button id="clearBtn">🧹 Очистить чат</button>
 </div>
 
 <script>
-const protocol = location.protocol === "https:" ? "wss" : "ws";
-const ws = new WebSocket(`${protocol}://${location.host}/ws`);
+const ws = new WebSocket(`ws://${location.host}/ws`);
+let myNick = "Гость";
 
-let myNick = "";
+const messagesDiv = document.getElementById("messages");
+const clearBtn = document.getElementById("clearBtn");
 
-// получение сообщений
 ws.onmessage = (e) => {
-    const text = e.data;
-    const msg = document.createElement("div");
-    msg.classList.add("msg");
+    const data = JSON.parse(e.data);
+    const div = document.createElement("div");
 
-    if (myNick && text.startsWith(myNick + ":")) {
-        msg.classList.add("me");
-        msg.textContent = text.replace(myNick + ":", "").trim();
+    if (data.type === "system") {
+        div.className = "system";
+        div.textContent = data.message;
     } else {
-        msg.classList.add("other");
-        msg.textContent = text;
+        div.textContent = `${data.nick}: ${data.text}`;
     }
 
-    document.getElementById("messages").appendChild(msg);
-    msg.scrollIntoView({ behavior: "smooth" });
+    messagesDiv.appendChild(div);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
 };
 
-// установка ника
 function setNick() {
-    const nick = document.getElementById("nick").value.trim();
-    if (!nick) return;
-    myNick = nick;
-    ws.send("/nick " + nick);
+    myNick = document.getElementById("nick").value || "Гость";
+
+    ws.send(JSON.stringify({
+        type: "nick",
+        nick: myNick
+    }));
+
+    // кнопка ТОЛЬКО для руслан
+    clearBtn.style.display = (myNick === "руслан") ? "block" : "none";
 }
 
-// отправка сообщения
 function sendMessage() {
-    const input = document.getElementById("text");
-    const text = input.value.trim();
+    const text = document.getElementById("text").value;
     if (!text) return;
-    ws.send(text);
-    input.value = "";
+
+    ws.send(JSON.stringify({
+        type: "message",
+        text: text
+    }));
+
+    document.getElementById("text").value = "";
 }
+
+clearBtn.onclick = () => {
+    if (!confirm("Очистить чат для всех?")) return;
+
+    ws.send(JSON.stringify({
+        type: "clear_chat"
+    }));
+};
 </script>
 
 </body>
