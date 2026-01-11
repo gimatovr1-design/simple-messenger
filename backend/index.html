@@ -9,30 +9,71 @@
 
 body {
     margin: 0;
-    font-family: Arial, sans-serif;
-    background: #111;
-    color: #fff;
-    display: flex;
-    flex-direction: column;
+    background: #0d0d0d;
     height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: Arial, sans-serif;
+    color: #fff;
 }
 
+/* === CHAT === */
+#chat {
+    width: 360px;
+    height: 520px;
+    background: #111;
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+    box-shadow: 0 0 25px rgba(0,0,0,0.8);
+    overflow: hidden;
+}
+
+/* === HEADER === */
 header {
     padding: 10px;
     background: #1a1a1a;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    font-size: 13px;
 }
 
+#nickname {
+    font-weight: bold;
+}
+
+#changeNick {
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+#changeNick:hover {
+    opacity: 1;
+}
+
+/* === STATUS === */
 #status {
-    font-size: 14px;
+    font-size: 12px;
 }
 
+/* === NOTIFY === */
+#notify {
+    display: none;
+    background: #ff4444;
+    color: #000;
+    text-align: center;
+    padding: 6px;
+    font-size: 13px;
+}
+
+/* === MESSAGES === */
 #messages {
     flex: 1;
     padding: 10px;
     overflow-y: auto;
+    font-size: 14px;
 }
 
 .message {
@@ -51,42 +92,39 @@ header {
     font-style: italic;
 }
 
+/* === FOOTER === */
 footer {
     display: flex;
-    padding: 10px;
+    padding: 8px;
     background: #1a1a1a;
 }
 
 input {
     flex: 1;
-    padding: 8px;
-    font-size: 16px;
+    padding: 6px;
+    font-size: 14px;
     border: none;
     outline: none;
 }
 
 button {
-    padding: 8px 14px;
-    margin-left: 8px;
-    font-size: 16px;
-    cursor: pointer;
-}
-
-#notify {
-    display: none;
-    background: #ff4444;
-    color: #000;
-    padding: 6px;
-    text-align: center;
+    padding: 6px 12px;
+    margin-left: 6px;
     font-size: 14px;
+    cursor: pointer;
 }
 </style>
 </head>
 
 <body>
 
+<div id="chat">
+
 <header>
-    <div>💬 Simple Messenger</div>
+    <div>
+        <span id="nickname"></span>
+        <span id="changeNick">✎</span>
+    </div>
     <div id="status">🔴 offline</div>
 </header>
 
@@ -95,9 +133,11 @@ button {
 <div id="messages"></div>
 
 <footer>
-    <input id="input" type="text" placeholder="Введите сообщение..." disabled>
+    <input id="input" type="text" placeholder="Сообщение..." disabled>
     <button id="sendBtn" disabled>➤</button>
 </footer>
+
+</div>
 
 <script>
 let ws = null;
@@ -108,16 +148,37 @@ const input = document.getElementById("input");
 const sendBtn = document.getElementById("sendBtn");
 const messages = document.getElementById("messages");
 const notify = document.getElementById("notify");
+const nickEl = document.getElementById("nickname");
+const changeNickBtn = document.getElementById("changeNick");
 
+/* === NICKNAME === */
+let nickname = localStorage.getItem("nickname") || "Гость";
+
+function updateNick() {
+    nickEl.textContent = nickname;
+    localStorage.setItem("nickname", nickname);
+}
+updateNick();
+
+changeNickBtn.onclick = () => {
+    const newNick = prompt("Введите новый ник:", nickname);
+    if (!newNick) return;
+    nickname = newNick.trim();
+    if (!nickname) return;
+    updateNick();
+    addMessage(`Ник изменён на "${nickname}"`, "system");
+};
+
+/* === TIME === */
 function now() {
     const d = new Date();
     return d.toLocaleTimeString("ru-RU", {
         hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit"
+        minute: "2-digit"
     });
 }
 
+/* === MESSAGE === */
 function addMessage(text, cls = "") {
     const div = document.createElement("div");
     div.className = "message " + cls;
@@ -131,11 +192,11 @@ function addMessage(text, cls = "") {
 
     div.appendChild(time);
     div.appendChild(msg);
-
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
 }
 
+/* === STATUS === */
 function setOnline(state) {
     if (state) {
         statusEl.textContent = "🟢 online";
@@ -151,6 +212,7 @@ function setOnline(state) {
     }
 }
 
+/* === WS === */
 function connect() {
     ws = new WebSocket(
         (location.protocol === "https:" ? "wss://" : "ws://") +
@@ -167,10 +229,6 @@ function connect() {
         addMessage(e.data);
     };
 
-    ws.onerror = () => {
-        addMessage("Ошибка соединения", "system");
-    };
-
     ws.onclose = () => {
         setOnline(false);
         addMessage("Переподключение...", "system");
@@ -178,18 +236,18 @@ function connect() {
     };
 }
 
+/* === SEND === */
 function sendMessage() {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
     const text = input.value.trim();
     if (!text) return;
 
-    ws.send(text);
+    ws.send(`${nickname}: ${text}`);
     input.value = "";
 }
 
 sendBtn.onclick = sendMessage;
-
 input.addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
 });
