@@ -150,10 +150,16 @@ input::placeholder { color: #94a3b8; }
 </div>
 
 <script>
-/* ---------- НИК ---------- */
+/* ---------- НИК (ИСПРАВЛЕНО) ---------- */
 let nickname = localStorage.getItem("nickname");
-if (!nickname) {
+
+if (!nickname || nickname === "null") {
     nickname = prompt("Введите ник:");
+
+    if (!nickname || !nickname.trim()) {
+        nickname = "Guest" + Math.floor(Math.random() * 1000);
+    }
+
     localStorage.setItem("nickname", nickname);
 }
 
@@ -172,7 +178,7 @@ function connect() {
     ws = new WebSocket(`${protocol}://${location.host}/ws`);
 
     ws.onopen = () => {
-        ws.send(nickname); // первое сообщение — ник
+        ws.send(nickname);
         statusDot.classList.add("online");
         statusText.textContent = "В сети";
     };
@@ -198,7 +204,7 @@ connect();
 /* ---------- SEND ---------- */
 function sendMessage() {
     if (!input.value.trim()) return;
-    ws.send(nickname + ": " + input.value); // ВАЖНО
+    ws.send(nickname + ": " + input.value);
     input.value = "";
 }
 
@@ -208,7 +214,7 @@ input.onkeydown = e => e.key === "Enter" && sendMessage();
 /* ---------- CHANGE NICK ---------- */
 document.getElementById("changeNick").onclick = () => {
     const newNick = prompt("Новый ник:");
-    if (!newNick) return;
+    if (!newNick || !newNick.trim()) return;
 
     localStorage.setItem("nickname", newNick);
     nickname = newNick;
