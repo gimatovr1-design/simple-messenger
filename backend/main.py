@@ -11,7 +11,7 @@ app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MESSAGES_FILE = os.path.join(BASE_DIR, "messages.json")
 
-# ===== ПАПКА ДЛЯ ФОТО =====
+# ===== ПАПКА ДЛЯ ФОТО И ВИДЕО =====
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
@@ -39,17 +39,26 @@ async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 
-# ===== ЗАГРУЗКА ФОТО =====
+# ===== ЗАГРУЗКА ФОТО И ВИДЕО =====
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
-    ext = os.path.splitext(file.filename)[1]
+    ext = os.path.splitext(file.filename)[1].lower()
     name = f"{uuid4()}{ext}"
     path = os.path.join(UPLOAD_DIR, name)
 
     with open(path, "wb") as f:
-        f.write(await file.read())
+        while True:
+            chunk = await file.read(1024 * 1024)  # 1 MB chunks
+            if not chunk:
+                break
+            f.write(chunk)
 
-    return {"url": f"/uploads/{name}"}
+    media_type = "video" if file.content_type.startswith("video") else "image"
+
+    return {
+        "url": f"/uploads/{name}",
+        "media_type": media_type
+    }
 
 
 class ConnectionManager:
@@ -63,11 +72,7 @@ class ConnectionManager:
         # отправляем историю
         for msg in load_messages():
             if isinstance(msg, dict):
-                await websocket.send_json({
-                    "type": "message",
-                    "nick": msg.get("nick", ""),
-                    "text": msg.get("text", "")
-                })
+                await websocket.send_json(msg)
 
     def disconnect(self, websocket: WebSocket):
         self.active.pop(websocket, None)
@@ -76,11 +81,7 @@ class ConnectionManager:
         save_message(message)
         for ws in list(self.active):
             try:
-                await ws.send_json({
-                    "type": "message",
-                    "nick": message["nick"],
-                    "text": message["text"]
-                })
+                await ws.send_json(message)
             except:
                 self.disconnect(ws)
 
@@ -123,7 +124,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
                 continue
 
+            # обычное текстовое сообщение
             await manager.broadcast({
+                "type": "text",
                 "nick": nick,
                 "text": text
             })
