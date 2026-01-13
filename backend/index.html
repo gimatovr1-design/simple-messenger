@@ -1,182 +1,9 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<title>Simple Messenger</title>
-
-<style>
-* { box-sizing: border-box; }
-
-body {
-    margin: 0;
-    height: 100vh;
-    background: radial-gradient(circle at top, #1a2a3a, #050b12);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-family: Arial, sans-serif;
-    color: #fff;
-}
-
-.chat {
-    width: 820px;
-    height: 520px;
-    display: flex;
-    background: rgba(10,15,20,0.85);
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 0 40px rgba(0,255,255,0.15);
-}
-
-/* ===== Онлайн ===== */
-.sidebar {
-    width: 200px;
-    background: rgba(0,0,0,0.35);
-    padding: 10px;
-}
-
-.sidebar h3 {
-    margin: 0 0 10px;
-    font-size: 14px;
-}
-
-.user {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-    font-size: 14px;
-}
-
-.dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #00ff88;
-}
-
-/* ===== Чат ===== */
-.main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.messages {
-    flex: 1;
-    padding: 12px;
-    overflow-y: auto;
-}
-
-.msg {
-    max-width: 60%;
-    padding: 8px 10px;
-    margin-bottom: 8px;
-    border-radius: 10px;
-    word-wrap: break-word;
-}
-
-.me {
-    background: linear-gradient(135deg, #7f5af0, #9d4edd);
-    margin-left: auto;
-}
-
-.other {
-    background: rgba(255,255,255,0.15);
-    margin-right: auto;
-}
-
-.nick {
-    font-size: 11px;
-    opacity: 0.7;
-    margin-bottom: 2px;
-}
-
-/* ===== Ввод ===== */
-.input {
-    display: flex;
-    gap: 6px;
-    padding: 10px;
-    background: rgba(0,0,0,0.35);
-}
-
-.input input[type="text"] {
-    flex: 1;
-    padding: 8px;
-    border-radius: 6px;
-    border: none;
-    outline: none;
-    font-size: 14px;
-}
-
-.btn {
-    width: 38px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    background: #1f2937;
-    color: #fff;
-    font-size: 18px;
-}
-
-.send {
-    width: 90px;
-    background: #2563eb;
-}
-
-/* ===== Эмодзи ===== */
-.emoji-panel {
-    position: absolute;
-    bottom: 70px;
-    right: 260px;
-    background: #111;
-    border-radius: 8px;
-    padding: 8px;
-    display: none;
-    flex-wrap: wrap;
-    width: 200px;
-}
-
-.emoji-panel span {
-    cursor: pointer;
-    font-size: 20px;
-    margin: 4px;
-}
-</style>
-</head>
-<body>
-
-<div class="chat">
-    <div class="sidebar">
-        <h3>Онлайн</h3>
-        <div id="users"></div>
-    </div>
-
-    <div class="main">
-        <div class="messages" id="messages"></div>
-
-        <div class="input">
-            <button class="btn" id="emojiBtn">😀</button>
-            <button class="btn" id="fileBtn">📎</button>
-            <input type="file" id="fileInput" hidden>
-            <input type="text" id="text" placeholder="Сообщение" autocomplete="off">
-            <button class="btn send" id="send">Отправить</button>
-        </div>
-    </div>
-</div>
-
-<div class="emoji-panel" id="emojiPanel">
-😀 😁 😂 🤣 😎 😍 🤖 🔥 🚀 💜 👍 👀 😡 😢 🎉
-</div>
-
 <script>
 const text = document.getElementById("text");
-const send = document.getElementById("send");
 const messages = document.getElementById("messages");
 const users = document.getElementById("users");
 const emojiBtn = document.getElementById("emojiBtn");
 const emojiPanel = document.getElementById("emojiPanel");
-const fileBtn = document.getElementById("fileBtn");
 const fileInput = document.getElementById("fileInput");
 
 let nick = "";
@@ -187,12 +14,13 @@ const ws = new WebSocket(
 );
 
 ws.onopen = () => {
-    ws.send("/nick " + nick);
+    ws.send(JSON.stringify({ type: "nick", nick }));
 };
 
 ws.onmessage = e => {
     const data = JSON.parse(e.data);
 
+    // ===== онлайн =====
     if (data.type === "users") {
         users.innerHTML = "";
         data.users.forEach(u => {
@@ -203,31 +31,51 @@ ws.onmessage = e => {
         });
     }
 
+    // ===== текст =====
     if (data.type === "message") {
-        const div = document.createElement("div");
-        div.className = "msg " + (data.nick === nick ? "me" : "other");
-        div.innerHTML = `<div class="nick">${data.nick}</div>${data.text}`;
-        messages.appendChild(div);
-        messages.scrollTop = messages.scrollHeight;
+        addMsg(data.nick, data.text);
+    }
+
+    // ===== файл =====
+    if (data.type === "file") {
+        if (data.mime.startsWith("image")) {
+            addMsg(
+                data.nick,
+                `<img src="${data.content}" style="max-width:200px;border-radius:8px">`
+            );
+        } else if (data.mime.startsWith("video")) {
+            addMsg(
+                data.nick,
+                `<video controls src="${data.content}" style="max-width:220px"></video>`
+            );
+        } else {
+            addMsg(
+                data.nick,
+                `<a href="${data.content}" download="${data.name}">📎 ${data.name}</a>`
+            );
+        }
     }
 };
 
+function addMsg(from, html) {
+    const div = document.createElement("div");
+    div.className = "msg " + (from === nick ? "me" : "other");
+    div.innerHTML = `<div class="nick">${from}</div>${html}`;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+}
+
+// ===== отправка текста =====
 function sendMsg() {
     if (!text.value.trim()) return;
-    ws.send(text.value);
+    ws.send(JSON.stringify({ type: "message", text: text.value }));
     text.value = "";
 }
 
 send.onclick = sendMsg;
+text.onkeydown = e => e.key === "Enter" && sendMsg();
 
-text.addEventListener("keydown", e => {
-    if (e.key === "Enter") {
-        e.preventDefault();
-        sendMsg();
-    }
-});
-
-/* Эмодзи */
+// ===== эмодзи =====
 emojiBtn.onclick = () => {
     emojiPanel.style.display =
         emojiPanel.style.display === "flex" ? "none" : "flex";
@@ -236,17 +84,23 @@ emojiBtn.onclick = () => {
 emojiPanel.onclick = e => {
     if (e.target.nodeType === 3) {
         text.value += e.target.textContent.trim();
-        text.focus();
     }
 };
 
-/* Файл (UI) */
-fileBtn.onclick = () => fileInput.click();
+// ===== файл =====
 fileInput.onchange = () => {
-    alert("Файл выбран: " + fileInput.files[0].name);
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = () => {
+        ws.send(JSON.stringify({
+            type: "file",
+            name: file.name,
+            mime: file.type,
+            content: reader.result
+        }));
+    };
+
+    reader.readAsDataURL(file);
 };
 </script>
-
-</body>
-</html>
-
