@@ -1,227 +1,295 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <title>Simple Messenger</title>
-
-<style>
-* { box-sizing: border-box; }
-body {
-    margin: 0;
-    height: 100vh;
-    background: radial-gradient(circle at top, #1a2a3a, #050b12);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-family: Arial, sans-serif;
-    color: #fff;
-}
-
-.chat {
-    width: 820px;
-    height: 520px;
-    display: flex;
-    background: rgba(10,15,20,0.85);
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-.sidebar {
-    width: 200px;
-    background: rgba(0,0,0,0.35);
-    padding: 10px;
-}
-.user {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 6px;
-}
-.dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #00ff88;
-}
-
-.main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-.messages {
-    flex: 1;
-    padding: 12px;
-    overflow-y: auto;
-}
-.msg {
-    max-width: 60%;
-    padding: 8px 10px;
-    margin-bottom: 8px;
-    border-radius: 10px;
-}
-.me { margin-left: auto; background: #7f5af0; }
-.other { margin-right: auto; background: rgba(255,255,255,0.15); }
-.nick { font-size: 11px; opacity: 0.7; }
-
-.input {
-    display: flex;
-    gap: 6px;
-    padding: 10px;
-    background: rgba(0,0,0,0.35);
-}
-.input input {
-    flex: 1;
-    padding: 8px;
-    border-radius: 6px;
-    border: none;
-    outline: none;
-}
-.btn {
-    width: 38px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    background: #1f2937;
-    color: #fff;
-}
-.send { width: 90px; background: #2563eb; }
-
-.emoji-panel {
-    position: absolute;
-    bottom: 70px;
-    right: 260px;
-    background: #111;
-    border-radius: 8px;
-    padding: 8px;
-    display: none;
-    width: 200px;
-}
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
+
 <body>
 
-<div class="chat">
-    <div class="sidebar">
-        <h3>Онлайн</h3>
-        <div id="users"></div>
-    </div>
+<h3>Добро пожаловать в чат 👋</h3>
 
-    <div class="main">
-        <div class="messages" id="messages"></div>
-        <div class="input">
-            <button class="btn" id="emojiBtn">😀</button>
-            <button class="btn" id="fileBtn">📎</button>
-            <input type="file" id="fileInput" hidden>
-            <input type="text" id="text" placeholder="Сообщение" autocomplete="off">
-            <button class="btn send" id="send">Отправить</button>
-        </div>
-    </div>
+<!-- ===== ВВОД НИКА ===== -->
+<div id="nickBox">
+    <input id="nickInput" placeholder="Введите ник" autocomplete="off">
+    <button onclick="setNick()">OK</button>
 </div>
 
-<div class="emoji-panel" id="emojiPanel">
-😀 😁 😂 🤣 😎 😍 🤖 🔥 🚀 💜 👍 👀 😡 😢 🎉
+<div class="layout">
+
+    <!-- ===== СПИСОК ОНЛАЙН ===== -->
+    <div id="users">
+        <b>Онлайн</b>
+        <ul id="userList"></ul>
+    </div>
+
+    <!-- ===== ЧАТ ===== -->
+    <div class="chatBox">
+        <div id="chat"></div>
+
+        <div class="inputBox">
+            <input id="messageInput" placeholder="Сообщение">
+            <button onclick="sendMessage()">Отправить</button>
+        </div>
+    </div>
+
 </div>
 
 <script>
-// ===== DOM =====
-const users = document.getElementById("users");
-const messages = document.getElementById("messages");
-const text = document.getElementById("text");
-const send = document.getElementById("send");
-const emojiBtn = document.getElementById("emojiBtn");
-const emojiPanel = document.getElementById("emojiPanel");
-const fileBtn = document.getElementById("fileBtn");
-const fileInput = document.getElementById("fileInput");
+let myNick = "";                 // ❌ НЕ сохраняется
+let users = new Set();           // онлайн пользователи
 
-// ===== NICK =====
-let nick = "";
-while (!nick) nick = prompt("Введите ник");
-
-// ===== WS =====
-const ws = new WebSocket(
-    (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"
+let ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") +
+    location.host + "/ws"
 );
 
-ws.addEventListener("open", () => {
-    ws.send(JSON.stringify({ type: "nick", nick }));
-});
+ws.onmessage = (event) => {
+    let data;
+    try { data = JSON.parse(event.data); } catch { return; }
 
-ws.addEventListener("message", e => {
-    const data = JSON.parse(e.data);
-
-    if (data.type === "users") {
-        users.innerHTML = "";
-        data.users.forEach(u => {
-            users.innerHTML += `<div class="user"><span class="dot"></span>${u}</div>`;
-        });
+    // системные сообщения
+    if (data.type === "system") {
+        handleSystem(data.text);
+        return;
     }
 
+    // обычные сообщения
     if (data.type === "message") {
-        addMsg(data.nick, data.text);
+        users.add(data.nick);
+        renderUsers();
+
+        const side = data.nick === myNick ? "me" : "other";
+        addMessage(data.nick, data.text, side);
+    }
+};
+
+function handleSystem(text) {
+    // ник установлен
+    if (text.includes("Ник установлен")) {
+        addSystem(text);
+        return;
     }
 
-    if (data.type === "file") {
-        if (data.mime.startsWith("image"))
-            addMsg(data.nick, `<img src="${data.content}" style="max-width:200px">`);
-        else if (data.mime.startsWith("video"))
-            addMsg(data.nick, `<video controls src="${data.content}" style="max-width:200px"></video>`);
-        else
-            addMsg(data.nick, `<a href="${data.content}" download="${data.name}">📎 ${data.name}</a>`);
+    // пользователь вошёл
+    if (text.includes("вошёл")) {
+        const nick = text.split(" ")[0];
+        users.add(nick);
+        renderUsers();
+        addSystem("🟢 " + text);
+        return;
     }
+
+    // пользователь вышел
+    if (text.includes("вышел")) {
+        const nick = text.split(" ")[0];
+        users.delete(nick);
+        renderUsers();
+        addSystem("🔴 " + text);
+        return;
+    }
+
+    addSystem(text);
+}
+
+function setNick() {
+    const nick = document.getElementById("nickInput").value.trim();
+    if (!nick) return;
+
+    myNick = nick;
+    ws.send("/nick " + nick);
+    document.getElementById("nickBox").style.display = "none";
+}
+
+function sendMessage() {
+    const input = document.getElementById("messageInput");
+    if (input.value.trim()) {
+        ws.send(input.value);
+        input.value = "";
+    }
+}
+
+// отправка по Enter
+document.getElementById("messageInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") sendMessage();
 });
 
-function addMsg(from, html) {
+function addMessage(nick, text, side) {
+    const chat = document.getElementById("chat");
+
+    const msg = document.createElement("div");
+    msg.className = "msg " + side;
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = nick[0].toUpperCase();
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = `<b>${nick}</b><br>${text}`;
+
+    msg.appendChild(avatar);
+    msg.appendChild(bubble);
+
+    chat.appendChild(msg);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function addSystem(text) {
     const div = document.createElement("div");
-    div.className = "msg " + (from === nick ? "me" : "other");
-    div.innerHTML = `<div class="nick">${from}</div>${html}`;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+    div.className = "system";
+    div.textContent = text;
+    chat.appendChild(div);
 }
 
-// ===== SEND =====
-function sendMsg() {
-    if (!text.value.trim()) return;
-    if (ws.readyState !== 1) return;
-    ws.send(JSON.stringify({ type: "message", text: text.value }));
-    text.value = "";
+function renderUsers() {
+    const list = document.getElementById("userList");
+    list.innerHTML = "";
+    users.forEach(nick => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span class="dot"></span>${nick}`;
+        list.appendChild(li);
+    });
 }
-
-send.addEventListener("click", sendMsg);
-
-text.addEventListener("keydown", e => {
-    if (e.key === "Enter") {
-        e.preventDefault();
-        sendMsg();
-    }
-});
-
-// ===== EMOJI =====
-emojiBtn.onclick = () => {
-    emojiPanel.style.display =
-        emojiPanel.style.display === "block" ? "none" : "block";
-};
-emojiPanel.onclick = e => {
-    if (e.target.nodeType === 3) {
-        text.value += e.target.textContent.trim();
-        text.focus();
-    }
-};
-
-// ===== FILE =====
-fileBtn.onclick = () => fileInput.click();
-fileInput.onchange = () => {
-    const f = fileInput.files[0];
-    const r = new FileReader();
-    r.onload = () => {
-        ws.send(JSON.stringify({
-            type: "file",
-            name: f.name,
-            mime: f.type,
-            content: r.result
-        }));
-    };
-    r.readAsDataURL(f);
-};
 </script>
+
+<style>
+/* ===== ОБЩЕЕ ===== */
+body {
+    margin: 0;
+    padding: 10px;
+    min-height: 100vh;
+    font-family: system-ui, sans-serif;
+    color: #fff;
+
+    background:
+        linear-gradient(120deg,
+            rgba(140,0,255,.45),
+            rgba(0,180,255,.45),
+            rgba(255,0,140,.45)
+        ),
+        url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee");
+
+    background-size: 300% 300%, cover;
+    background-attachment: fixed;
+    animation: neonMove 20s ease infinite;
+}
+
+@keyframes neonMove {
+    0% { background-position: 0% 50%, center; }
+    50% { background-position: 100% 50%, center; }
+    100% { background-position: 0% 50%, center; }
+}
+
+/* ===== LAYOUT ===== */
+.layout {
+    display: flex;
+    gap: 10px;
+}
+
+#users {
+    width: 160px;
+    background: rgba(0,0,0,.45);
+    padding: 8px;
+    border-radius: 8px;
+}
+
+#userList {
+    list-style: none;
+    padding: 0;
+    margin: 6px 0 0;
+}
+
+#userList li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    background: #00ff88;
+    border-radius: 50%;
+}
+
+/* ===== ЧАТ ===== */
+.chatBox {
+    flex: 1;
+}
+
+#chat {
+    height: 320px;
+    overflow-y: auto;
+    background: rgba(0,0,0,.45);
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.msg {
+    display: flex;
+    margin-bottom: 8px;
+    animation: fadeIn .3s ease;
+}
+
+.msg.me {
+    flex-direction: row-reverse;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+}
+
+.avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 6px;
+    font-weight: bold;
+}
+
+.bubble {
+    max-width: 65%;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(0,255,255,.35);
+}
+
+.msg.other .bubble {
+    background: rgba(255,0,255,.35);
+}
+
+.system {
+    text-align: center;
+    font-size: 13px;
+    opacity: .8;
+    margin: 6px 0;
+}
+
+/* ===== ВВОД ===== */
+.inputBox {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+input {
+    flex: 1;
+    padding: 6px;
+}
+
+button {
+    padding: 6px 12px;
+    cursor: pointer;
+}
+</style>
+
 </body>
 </html>
