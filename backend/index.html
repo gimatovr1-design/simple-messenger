@@ -106,6 +106,7 @@ body {
     border-radius: 6px;
     border: none;
     outline: none;
+    font-size: 14px;
 }
 
 .btn {
@@ -155,26 +156,37 @@ body {
         <div class="messages" id="messages"></div>
 
         <div class="input">
-            <button class="btn" id="emojiBtn">😀</button>
-            <button class="btn" id="fileBtn">📎</button>
+            <button class="btn" id="emojiBtn" type="button">😀</button>
+            <button class="btn" id="fileBtn" type="button">📎</button>
             <input type="file" id="fileInput" hidden>
-            <input type="text" id="text" placeholder="Сообщение">
-            <button class="btn send" id="send">Отправить</button>
+            <input type="text" id="text" placeholder="Сообщение" autocomplete="off">
+            <button class="btn send" id="send" type="button">Отправить</button>
         </div>
     </div>
 </div>
 
 <div class="emoji-panel" id="emojiPanel">
-    😀 😁 😂 🤣 😎 😍 🤖 🔥 🚀 💜 👍 👀 😡 😢 🎉
+<span>😀</span><span>😁</span><span>😂</span><span>🤣</span>
+<span>😎</span><span>😍</span><span>🤖</span><span>🔥</span>
+<span>🚀</span><span>💜</span><span>👍</span><span>👀</span>
+<span>😡</span><span>😢</span><span>🎉</span>
 </div>
 
 <script>
+const text = document.getElementById("text");
+const send = document.getElementById("send");
+const messages = document.getElementById("messages");
+const users = document.getElementById("users");
+const emojiBtn = document.getElementById("emojiBtn");
+const emojiPanel = document.getElementById("emojiPanel");
+const fileBtn = document.getElementById("fileBtn");
+const fileInput = document.getElementById("fileInput");
+
 let ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"
 );
 
 let nick = null;
-
 while (!nick) nick = prompt("Введите ник");
 
 ws.onopen = () => {
@@ -182,12 +194,12 @@ ws.onopen = () => {
 };
 
 ws.onmessage = e => {
-    let data = JSON.parse(e.data);
+    const data = JSON.parse(e.data);
 
     if (data.type === "users") {
         users.innerHTML = "";
         data.users.forEach(u => {
-            let d = document.createElement("div");
+            const d = document.createElement("div");
             d.className = "user";
             d.innerHTML = `<span class="dot"></span>${u}`;
             users.appendChild(d);
@@ -195,7 +207,7 @@ ws.onmessage = e => {
     }
 
     if (data.type === "message") {
-        let div = document.createElement("div");
+        const div = document.createElement("div");
         div.className = "msg " + (data.nick === nick ? "me" : "other");
         div.innerHTML = `<div class="nick">${data.nick}</div>${data.text}`;
         messages.appendChild(div);
@@ -204,28 +216,40 @@ ws.onmessage = e => {
 };
 
 send.onclick = sendMsg;
-text.onkeydown = e => e.key === "Enter" && sendMsg();
+
+text.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        sendMsg();
+    }
+});
 
 function sendMsg() {
-    if (!text.value) return;
+    if (!text.value.trim()) return;
     ws.send(JSON.stringify({type:"message", text:text.value}));
     text.value = "";
+    text.focus();
 }
 
 /* ===== Эмодзи ===== */
 emojiBtn.onclick = () => {
     emojiPanel.style.display =
         emojiPanel.style.display === "flex" ? "none" : "flex";
+    text.focus();
 };
 
 emojiPanel.onclick = e => {
-    if (e.target.tagName === "SPAN") text.value += e.target.textContent;
+    if (e.target.tagName === "SPAN") {
+        text.value += e.target.textContent;
+        text.focus();
+    }
 };
 
-/* ===== Файл (пока UI, без сервера) ===== */
+/* ===== Файл (пока UI) ===== */
 fileBtn.onclick = () => fileInput.click();
 fileInput.onchange = () => {
     alert("Файл выбран: " + fileInput.files[0].name);
+    text.focus();
 };
 </script>
 
