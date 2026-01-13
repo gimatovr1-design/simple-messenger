@@ -156,20 +156,17 @@ body {
         <div class="messages" id="messages"></div>
 
         <div class="input">
-            <button class="btn" id="emojiBtn" type="button">😀</button>
-            <button class="btn" id="fileBtn" type="button">📎</button>
+            <button class="btn" id="emojiBtn">😀</button>
+            <button class="btn" id="fileBtn">📎</button>
             <input type="file" id="fileInput" hidden>
             <input type="text" id="text" placeholder="Сообщение" autocomplete="off">
-            <button class="btn send" id="send" type="button">Отправить</button>
+            <button class="btn send" id="send">Отправить</button>
         </div>
     </div>
 </div>
 
 <div class="emoji-panel" id="emojiPanel">
-<span>😀</span><span>😁</span><span>😂</span><span>🤣</span>
-<span>😎</span><span>😍</span><span>🤖</span><span>🔥</span>
-<span>🚀</span><span>💜</span><span>👍</span><span>👀</span>
-<span>😡</span><span>😢</span><span>🎉</span>
+😀 😁 😂 🤣 😎 😍 🤖 🔥 🚀 💜 👍 👀 😡 😢 🎉
 </div>
 
 <script>
@@ -182,15 +179,15 @@ const emojiPanel = document.getElementById("emojiPanel");
 const fileBtn = document.getElementById("fileBtn");
 const fileInput = document.getElementById("fileInput");
 
-let ws = new WebSocket(
+let nick = "";
+while (!nick) nick = prompt("Введите ник");
+
+const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"
 );
 
-let nick = null;
-while (!nick) nick = prompt("Введите ник");
-
 ws.onopen = () => {
-    ws.send(JSON.stringify({type:"nick", nick}));
+    ws.send("/nick " + nick);
 };
 
 ws.onmessage = e => {
@@ -215,6 +212,12 @@ ws.onmessage = e => {
     }
 };
 
+function sendMsg() {
+    if (!text.value.trim()) return;
+    ws.send(text.value);
+    text.value = "";
+}
+
 send.onclick = sendMsg;
 
 text.addEventListener("keydown", e => {
@@ -224,34 +227,26 @@ text.addEventListener("keydown", e => {
     }
 });
 
-function sendMsg() {
-    if (!text.value.trim()) return;
-    ws.send(JSON.stringify({type:"message", text:text.value}));
-    text.value = "";
-    text.focus();
-}
-
-/* ===== Эмодзи ===== */
+/* Эмодзи */
 emojiBtn.onclick = () => {
     emojiPanel.style.display =
         emojiPanel.style.display === "flex" ? "none" : "flex";
-    text.focus();
 };
 
 emojiPanel.onclick = e => {
-    if (e.target.tagName === "SPAN") {
-        text.value += e.target.textContent;
+    if (e.target.nodeType === 3) {
+        text.value += e.target.textContent.trim();
         text.focus();
     }
 };
 
-/* ===== Файл (пока UI) ===== */
+/* Файл (UI) */
 fileBtn.onclick = () => fileInput.click();
 fileInput.onchange = () => {
     alert("Файл выбран: " + fileInput.files[0].name);
-    text.focus();
 };
 </script>
 
 </body>
 </html>
+
