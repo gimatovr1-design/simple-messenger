@@ -28,9 +28,13 @@
     <div class="chatBox">
         <div id="chat"></div>
 
+        <!-- ===== ЭМОДЗИ ===== -->
+        <div id="emojiPanel"></div>
+
         <div class="inputBox">
+            <button onclick="toggleEmoji()">😀</button>
             <input type="file" id="fileInput" accept="image/*,video/*">
-            <input id="messageInput" placeholder="Сообщение 😊">
+            <input id="messageInput" placeholder="Сообщение">
             <button onclick="sendMessage()">Отправить</button>
         </div>
     </div>
@@ -40,6 +44,8 @@
 <script>
 let myNick = "";
 let users = new Set();
+
+const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😿 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤️ 💔 💖 💕 💯 🔥 🎉 😺 😸 😹 😻 😼 😽 🙀 😿 😾".split(" ");
 
 let ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") +
@@ -66,22 +72,6 @@ ws.onmessage = (event) => {
     }
 };
 
-function handleSystem(text) {
-    if (text.includes("вошёл")) {
-        users.add(text.split(" ")[0]);
-        renderUsers();
-        addSystem("🟢 " + text);
-        return;
-    }
-    if (text.includes("вышел")) {
-        users.delete(text.split(" ")[0]);
-        renderUsers();
-        addSystem("🔴 " + text);
-        return;
-    }
-    addSystem(text);
-}
-
 function setNick() {
     const nick = nickInput.value.trim();
     if (!nick) return;
@@ -91,31 +81,21 @@ function setNick() {
 }
 
 function sendMessage() {
-    const input = messageInput;
+    const text = messageInput.value.trim();
     const file = fileInput.files[0];
 
     if (file) {
-        const MAX_VIDEO = 5 * 1024 * 1024;
-
-        if (file.type.startsWith("video") && file.size > MAX_VIDEO) {
-            alert("Видео слишком большое (макс 5 МБ)");
-            return;
-        }
-
         const reader = new FileReader();
-        reader.onload = () => {
-            ws.send(reader.result);
-        };
+        reader.onload = () => ws.send(reader.result);
         reader.readAsDataURL(file);
-
         fileInput.value = "";
-        input.value = "";
+        messageInput.value = "";
         return;
     }
 
-    if (input.value.trim()) {
-        ws.send(input.value);
-        input.value = "";
+    if (text) {
+        ws.send(text);
+        messageInput.value = "";
     }
 }
 
@@ -124,15 +104,13 @@ messageInput.addEventListener("keydown", e => {
 });
 
 function addRawMessage(text) {
-    const chat = document.getElementById("chat");
     const msg = document.createElement("div");
     msg.className = "msg other";
-
     const bubble = document.createElement("div");
     bubble.className = "bubble";
 
     if (text.startsWith("data:image")) {
-        bubble.innerHTML = `<img src="${text}" style="max-width:200px;border-radius:8px">`;
+        bubble.innerHTML = `<img src="${text}" style="max-width:220px;border-radius:8px">`;
     } else if (text.startsWith("data:video")) {
         bubble.innerHTML = `
             <video controls style="max-width:240px;border-radius:8px">
@@ -148,7 +126,6 @@ function addRawMessage(text) {
 }
 
 function addMessage(nick, text, side) {
-    const chat = document.getElementById("chat");
     const msg = document.createElement("div");
     msg.className = "msg " + side;
 
@@ -166,7 +143,7 @@ function addMessage(nick, text, side) {
     chat.scrollTop = chat.scrollHeight;
 }
 
-function addSystem(text) {
+function handleSystem(text) {
     const div = document.createElement("div");
     div.className = "system";
     div.textContent = text;
@@ -175,12 +152,28 @@ function addSystem(text) {
 
 function renderUsers() {
     userList.innerHTML = "";
-    users.forEach(n => {
+    users.forEach(u => {
         const li = document.createElement("li");
-        li.innerHTML = `<span class="dot"></span>${n}`;
+        li.innerHTML = `<span class="dot"></span>${u}`;
         userList.appendChild(li);
     });
 }
+
+/* ===== EMOJI ===== */
+function toggleEmoji() {
+    emojiPanel.style.display =
+        emojiPanel.style.display === "block" ? "none" : "block";
+}
+
+emojis.forEach(e => {
+    const span = document.createElement("span");
+    span.textContent = e;
+    span.onclick = () => {
+        messageInput.value += e;
+        messageInput.focus();
+    };
+    emojiPanel.appendChild(span);
+});
 </script>
 
 <style>
@@ -190,12 +183,7 @@ body {
     min-height: 100vh;
     font-family: system-ui, sans-serif;
     color: #fff;
-    background:
-        linear-gradient(120deg,
-            rgba(140,0,255,.45),
-            rgba(0,180,255,.45),
-            rgba(255,0,140,.45)
-        );
+    background: linear-gradient(120deg,#7f00ff,#00c6ff,#ff0080);
 }
 
 .layout { display: flex; gap: 10px; }
@@ -247,13 +235,29 @@ body {
     text-align: center;
     font-size: 13px;
     opacity: .8;
-    margin: 6px 0;
 }
 
 .inputBox {
     display: flex;
     gap: 6px;
     margin-top: 6px;
+}
+
+#emojiPanel {
+    display: none;
+    background: rgba(0,0,0,.5);
+    padding: 6px;
+    border-radius: 8px;
+    margin-top: 6px;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+#emojiPanel span {
+    cursor: pointer;
+    font-size: 20px;
+    padding: 4px;
+    display: inline-block;
 }
 
 input, button {
