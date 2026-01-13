@@ -1,68 +1,153 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import FileResponse
-import uvicorn, os, json
+from fastapi.staticfiles import StaticFiles
+import uvicorn
+import json
+import os
+from uuid import uuid4
 
 app = FastAPI()
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MESSAGES_FILE = os.path.join(BASE_DIR, "messages.json")
+
+# ===== ПАПКА ДЛЯ ФОТО / ВИДЕО =====
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
+
+def load_messages():
+    if not os.path.exists(MESSAGES_FILE):
+        return []
+    try:
+        with open(MESSAGES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return []
+
+
+def save_message(message: dict):
+    messages = load_messages()
+    messages.append(message)
+    with open(MESSAGES_FILE, "w", encoding="utf-8") as f:
+        json.dump(messages, f, ensure_ascii=False, indent=2)
+
 
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
-class Manager:
+
+# ===== ЗАГРУЗКА ФОТО И ВИДЕО =====
+@app.post("/upload")
+async def upload(file: UploadFile = File(...)):
+    ext = os.path.splitext(file.filename)[1]
+    name = f"{uuid4()}{ext}"
+    path = os.path.join(UPLOAD_DIR, name)
+
+    with open(path, "wb") as f:
+        f.write(await file.read())
+
+    return {"url": f"/uploads/{name}"}
+
+
+class ConnectionManager:
     def __init__(self):
-        self.clients: dict[WebSocket, str] = {}
+        self.active: dict[WebSocket, str] = {}
 
-    async def connect(self, ws: WebSocket):
-        await ws.accept()
-        self.clients[ws] = ""
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active[websocket] = ""
 
-    def disconnect(self, ws: WebSocket):
-        self.clients.pop(ws, None)
+        # отправляем историю
+        for msg in load_messages():
+            if isinstance(msg, dict):
+                await websocket.send_json({
+                    "type": "message",   # ❗ ВАЖНО
+                    "nick": msg.get("nick", ""),
+                    "text": msg.get("text", "")
+                })
 
-    async def send(self, ws, data):
-        await ws.send_json(data)
+    def disconnect(self, websocket: WebSocket):
+        self.active.pop(websocket, None)
 
-    async def broadcast(self, data, skip=None):
-        for c in list(self.clients):
-            if c != skip:
-                try: await c.send_json(data)
-                except: self.disconnect(c)
+    async def broadcast(self, message: dict):
+        save_message(message)
+        for ws in list(self.active):
+            try:
+                await ws.send_json({
+                    "type": "message",   # ❗ ВАЖНО
+                    "nick": message["nick"],
+                    "text": message["text"]
+                })
+            except:
+                self.disconnect(ws)
 
-manager = Manager()
+
+manager = ConnectionManager()
+
 
 @app.websocket("/ws")
-async def ws(ws: WebSocket):
-    await manager.connect(ws)
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+
     try:
         while True:
-            msg = await ws.receive_text()
-
-            if msg.startswith("/nick "):
-                manager.clients[ws] = msg[6:]
-                await manager.send(ws, {"type":"system","text":"✅ Ник установлен"})
+            text = (await websocket.receive_text()).strip()
+            if not text:
                 continue
 
-            try:
-                data = json.loads(msg)
-            except:
-                await manager.broadcast({
-                    "type":"message",
-                    "nick": manager.clients.get(ws,""),
-                    "text": msg
+            # установка ника
+            if text.startswith("/nick "):
+                nick = text.replace("/nick ", "").strip()
+                if not nick:
+                    await websocket.send_json({
+                        "type": "system",
+                        "text": "❌ Ник не может быть пустым"
+                    })
+                    continue
+
+                manager.active[websocket] = nick
+                await websocket.send_json({
+                    "type": "system",
+                    "text": f"✅ Ник установлен: {nick}"
                 })
                 continue
 
-            data["from"] = manager.clients.get(ws,"")
-            if "to" in data:
-                for c,n in manager.clients.items():
-                    if n == data["to"]:
-                        await manager.send(c, data)
-            else:
-                await manager.broadcast(data, skip=ws)
+            nick = manager.active.get(websocket)
+            if not nick:
+                await websocket.send_json({
+                    "type": "system",
+                    "text": "❌ Сначала укажи ник"
+                })
+                continue
+
+            await manager.broadcast({
+                "type": "message",   # ❗ ВАЖНО
+                "nick": nick,
+                "text": text
+            })
 
     except WebSocketDisconnect:
-        manager.disconnect(ws)
+        manager.disconnect(websocket)
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+# ===== WEBRTC SIGNALING =====
+@app.websocket("/webrtc")
+async def webrtc_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # просто пересылаем сигнал всем
+            for ws in manager.active:
+                try:
+                    await ws.send_text(data)
+                except:
+                    pass
+    except WebSocketDisconnect:
+        pass
