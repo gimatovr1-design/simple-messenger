@@ -11,13 +11,11 @@ app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MESSAGES_FILE = os.path.join(BASE_DIR, "messages.json")
 
-# ===== ПАПКА ДЛЯ ФОТО / ВИДЕО =====
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
-# ===================== CHAT STORAGE =====================
 def load_messages():
     if not os.path.exists(MESSAGES_FILE):
         return []
@@ -28,7 +26,7 @@ def load_messages():
         return []
 
 
-def save_message(message: dict):
+def save_message(message):
     messages = load_messages()
     messages.append(message)
     with open(MESSAGES_FILE, "w", encoding="utf-8") as f:
@@ -40,7 +38,6 @@ async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 
-# ===================== UPLOAD =====================
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
     ext = os.path.splitext(file.filename)[1]
@@ -53,7 +50,6 @@ async def upload(file: UploadFile = File(...)):
     return {"url": f"/uploads/{name}"}
 
 
-# ===================== CHAT =====================
 class ConnectionManager:
     def __init__(self):
         self.active: dict[WebSocket, str] = {}
@@ -62,22 +58,17 @@ class ConnectionManager:
         await websocket.accept()
         self.active[websocket] = ""
 
-        # отправляем историю
         for msg in load_messages():
-            await websocket.send_json({
-                "type": "message",
-                "nick": msg.get("nick", ""),
-                "text": msg.get("text", "")
-            })
+            await websocket.send_json(msg)
 
     def disconnect(self, websocket: WebSocket):
         self.active.pop(websocket, None)
 
-    async def broadcast(self, message: dict):
-        save_message(message)
+    async def broadcast(self, data):
+        save_message(data)
         for ws in list(self.active):
             try:
-                await ws.send_json(message)
+                await ws.send_json(data)
             except:
                 self.disconnect(ws)
 
@@ -91,80 +82,45 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            text = (await websocket.receive_text()).strip()
-            if not text:
+            data = json.loads(await websocket.receive_text())
+
+            if data["type"] == "nick":
+                manager.active[websocket] = data["nick"]
                 continue
 
-            # /nick
-            if text.startswith("/nick "):
-                nick = text.replace("/nick ", "").strip()
-                if not nick:
-                    await websocket.send_json({
-                        "type": "system",
-                        "text": "❌ Ник не может быть пустым"
-                    })
-                    continue
+            # 📞 видеозвонок
+            if data["type"] == "video_call":
+                for ws, nick in manager.active.items():
+                    if nick == data["to"]:
+                        await ws.send_json({
+                            "type": "video_call",
+                            "from": manager.active[websocket]
+                        })
 
-                manager.active[websocket] = nick
-                await websocket.send_json({
-                    "type": "system",
-                    "text": f"✅ Ник установлен: {nick}"
-                })
-                continue
-
-            nick = manager.active.get(websocket)
-            if not nick:
-                await websocket.send_json({
-                    "type": "system",
-                    "text": "❌ Сначала укажи ник"
-                })
-                continue
-
-            await manager.broadcast({
-                "type": "message",
-                "nick": nick,
-                "text": text
-            })
+            # 💬 обычное сообщение
+            if data["type"] == "message":
+                await manager.broadcast(data)
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
 
-# ===================== WEBRTC SIGNALING =====================
-video_rooms: dict[str, set[WebSocket]] = {}
-
+# 🔁 WebRTC signaling
 @app.websocket("/webrtc")
-async def webrtc_endpoint(websocket: WebSocket):
+async def webrtc(websocket: WebSocket):
     await websocket.accept()
-
     try:
         while True:
-            data = json.loads(await websocket.receive_text())
-            msg_type = data.get("type")
-            room = data.get("room")
-
-            if not room:
-                continue
-
-            # join room
-            if msg_type == "video_join":
-                video_rooms.setdefault(room, set()).add(websocket)
-                continue
-
-            # relay signaling
-            if msg_type in ("video_offer", "video_answer", "video_ice"):
-                for ws in video_rooms.get(room, set()):
-                    if ws != websocket:
-                        try:
-                            await ws.send_text(json.dumps(data))
-                        except:
-                            pass
-
+            data = await websocket.receive_text()
+            for ws in manager.active:
+                try:
+                    await ws.send_text(data)
+                except:
+                    pass
     except WebSocketDisconnect:
-        # очистка
-        for room in video_rooms.values():
-            room.discard(websocket)
+        pass
 
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
