@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -10,7 +10,6 @@
 
 <h3>Добро пожаловать в чат 👋</h3>
 
-<!-- ===== ВВОД НИКА ===== -->
 <div id="nickBox">
     <input id="nickInput" placeholder="Введите ник" autocomplete="off">
     <button onclick="setNick()">OK</button>
@@ -18,27 +17,34 @@
 
 <div class="layout">
 
-    <!-- ===== СПИСОК ОНЛАЙН ===== -->
     <div id="users">
         <b>Онлайн</b>
         <ul id="userList"></ul>
     </div>
 
-    <!-- ===== ЧАТ ===== -->
     <div class="chatBox">
         <div id="chat"></div>
 
         <div class="inputBox">
+            <button onclick="toggleEmoji()">😀</button>
+
+            <label class="clip">
+                📎
+                <input type="file" id="fileInput" hidden>
+            </label>
+
             <input id="messageInput" placeholder="Сообщение">
             <button onclick="sendMessage()">Отправить</button>
         </div>
+
+        <div id="emojiPanel" class="emojiPanel"></div>
     </div>
 
 </div>
 
 <script>
-let myNick = "";                 // ❌ НЕ сохраняется
-let users = new Set();           // онлайн пользователи
+let myNick = "";
+let users = new Set();
 
 let ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") +
@@ -49,30 +55,24 @@ ws.onmessage = (event) => {
     let data;
     try { data = JSON.parse(event.data); } catch { return; }
 
-    // системные сообщения
     if (data.type === "system") {
         handleSystem(data.text);
         return;
     }
 
-    // обычные сообщения
     if (data.type === "message") {
         users.add(data.nick);
         renderUsers();
-
         const side = data.nick === myNick ? "me" : "other";
         addMessage(data.nick, data.text, side);
     }
 };
 
 function handleSystem(text) {
-    // ник установлен
     if (text.includes("Ник установлен")) {
         addSystem(text);
         return;
     }
-
-    // пользователь вошёл
     if (text.includes("вошёл")) {
         const nick = text.split(" ")[0];
         users.add(nick);
@@ -80,8 +80,6 @@ function handleSystem(text) {
         addSystem("🟢 " + text);
         return;
     }
-
-    // пользователь вышел
     if (text.includes("вышел")) {
         const nick = text.split(" ")[0];
         users.delete(nick);
@@ -89,14 +87,12 @@ function handleSystem(text) {
         addSystem("🔴 " + text);
         return;
     }
-
     addSystem(text);
 }
 
 function setNick() {
     const nick = document.getElementById("nickInput").value.trim();
     if (!nick) return;
-
     myNick = nick;
     ws.send("/nick " + nick);
     document.getElementById("nickBox").style.display = "none";
@@ -110,14 +106,12 @@ function sendMessage() {
     }
 }
 
-// отправка по Enter
 document.getElementById("messageInput").addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
 });
 
 function addMessage(nick, text, side) {
     const chat = document.getElementById("chat");
-
     const msg = document.createElement("div");
     msg.className = "msg " + side;
 
@@ -131,7 +125,6 @@ function addMessage(nick, text, side) {
 
     msg.appendChild(avatar);
     msg.appendChild(bubble);
-
     chat.appendChild(msg);
     chat.scrollTop = chat.scrollHeight;
 }
@@ -152,17 +145,42 @@ function renderUsers() {
         list.appendChild(li);
     });
 }
+
+/* ===== ЭМОДЗИ ===== */
+const emojis = "😀😁😂🤣😃😄😅😉😊😍😘😜😎🤔😢😭😡👍👎🔥❤️💯🎉".split("");
+const panel = document.getElementById("emojiPanel");
+const input = document.getElementById("messageInput");
+
+emojis.forEach(e => {
+    const s = document.createElement("span");
+    s.textContent = e;
+    s.onclick = () => {
+        input.value += e;
+        input.focus();
+    };
+    panel.appendChild(s);
+});
+
+function toggleEmoji() {
+    panel.style.display = panel.style.display === "flex" ? "none" : "flex";
+}
+
+/* ===== ФАЙЛ ===== */
+document.getElementById("fileInput").addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    ws.send("📎 Файл: " + file.name);
+    e.target.value = "";
+});
 </script>
 
 <style>
-/* ===== ОБЩЕЕ ===== */
 body {
     margin: 0;
     padding: 10px;
     min-height: 100vh;
     font-family: system-ui, sans-serif;
     color: #fff;
-
     background:
         linear-gradient(120deg,
             rgba(140,0,255,.45),
@@ -170,7 +188,6 @@ body {
             rgba(255,0,140,.45)
         ),
         url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee");
-
     background-size: 300% 300%, cover;
     background-attachment: fixed;
     animation: neonMove 20s ease infinite;
@@ -182,7 +199,6 @@ body {
     100% { background-position: 0% 50%, center; }
 }
 
-/* ===== LAYOUT ===== */
 .layout {
     display: flex;
     gap: 10px;
@@ -215,10 +231,7 @@ body {
     border-radius: 50%;
 }
 
-/* ===== ЧАТ ===== */
-.chatBox {
-    flex: 1;
-}
+.chatBox { flex: 1; }
 
 #chat {
     height: 320px;
@@ -231,17 +244,9 @@ body {
 .msg {
     display: flex;
     margin-bottom: 8px;
-    animation: fadeIn .3s ease;
 }
 
-.msg.me {
-    flex-direction: row-reverse;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: none; }
-}
+.msg.me { flex-direction: row-reverse; }
 
 .avatar {
     width: 36px;
@@ -273,7 +278,6 @@ body {
     margin: 6px 0;
 }
 
-/* ===== ВВОД ===== */
 .inputBox {
     display: flex;
     gap: 6px;
@@ -288,6 +292,26 @@ input {
 button {
     padding: 6px 12px;
     cursor: pointer;
+}
+
+.emojiPanel {
+    display: none;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px;
+    background: rgba(0,0,0,.6);
+    border-radius: 8px;
+    margin-top: 6px;
+}
+
+.emojiPanel span {
+    cursor: pointer;
+    font-size: 20px;
+}
+
+.clip {
+    cursor: pointer;
+    user-select: none;
 }
 </style>
 
