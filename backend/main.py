@@ -1,35 +1,12 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 import uvicorn
-import json
-import os
 
 app = FastAPI()
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MESSAGES_FILE = os.path.join(BASE_DIR, "messages.json")
-
-
-def load_messages():
-    if not os.path.exists(MESSAGES_FILE):
-        return []
-    try:
-        with open(MESSAGES_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return []
-
-
-def save_message(message: dict):
-    messages = load_messages()
-    messages.append(message)
-    with open(MESSAGES_FILE, "w", encoding="utf-8") as f:
-        json.dump(messages, f, ensure_ascii=False, indent=2)
-
-
 @app.get("/")
 async def root():
-    return FileResponse(os.path.join(BASE_DIR, "index.html"))
+    return FileResponse("index.html")
 
 
 class ConnectionManager:
@@ -38,31 +15,28 @@ class ConnectionManager:
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
-        self.active[websocket] = ""
 
-        # отправляем историю
-        for msg in load_messages():
-            if isinstance(msg, dict):
-                await websocket.send_json({
-                    "type": "message",
-                    "nick": msg.get("nick", ""),
-                    "text": msg.get("text", "")
-                })
+    async def set_nick(self, websocket: WebSocket, nick: str):
+        self.active[websocket] = nick
+        await self.broadcast({
+            "type": "online",
+            "nick": nick
+        })
 
-    def disconnect(self, websocket: WebSocket):
-        self.active.pop(websocket, None)
+    async def disconnect(self, websocket: WebSocket):
+        nick = self.active.pop(websocket, None)
+        if nick:
+            await self.broadcast({
+                "type": "offline",
+                "nick": nick
+            })
 
     async def broadcast(self, message: dict):
-        save_message(message)
-        for ws in list(self.active):
+        for ws in list(self.active.keys()):
             try:
-                await ws.send_json({
-                    "type": "message",
-                    "nick": message["nick"],
-                    "text": message["text"]
-                })
+                await ws.send_json(message)
             except:
-                self.disconnect(ws)
+                await self.disconnect(ws)
 
 
 manager = ConnectionManager()
@@ -74,44 +48,26 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            text = (await websocket.receive_text()).strip()
-            if not text:
-                continue
+            data = await websocket.receive_text()
 
             # установка ника
-            if text.startswith("/nick "):
-                nick = text.replace("/nick ", "").strip()
-                if not nick:
-                    await websocket.send_json({
-                        "type": "system",
-                        "text": "❌ Ник не может быть пустым"
-                    })
-                    continue
-
-                manager.active[websocket] = nick
-                await websocket.send_json({
-                    "type": "system",
-                    "text": f"✅ Ник установлен: {nick}"
-                })
+            if data.startswith("/nick "):
+                nick = data.replace("/nick ", "").strip()
+                await manager.set_nick(websocket, nick)
                 continue
 
+            # обычное сообщение
             nick = manager.active.get(websocket)
-            if not nick:
-                await websocket.send_json({
-                    "type": "system",
-                    "text": "❌ Сначала укажи ник"
+            if nick:
+                await manager.broadcast({
+                    "type": "message",
+                    "nick": nick,
+                    "text": data
                 })
-                continue
-
-            await manager.broadcast({
-                "nick": nick,
-                "text": text
-            })
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        await manager.disconnect(websocket)
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
- 
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)

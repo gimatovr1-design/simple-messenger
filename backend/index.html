@@ -10,7 +10,6 @@
 
 <h3>Добро пожаловать в чат 👋</h3>
 
-<!-- ===== ВВОД НИКА ===== -->
 <div id="nickBox">
     <input id="nickInput" placeholder="Введите ник" autocomplete="off">
     <button onclick="setNick()">OK</button>
@@ -18,13 +17,11 @@
 
 <div class="layout">
 
-    <!-- ===== СПИСОК ОНЛАЙН ===== -->
     <div id="users">
         <b>Онлайн</b>
         <ul id="userList"></ul>
     </div>
 
-    <!-- ===== ЧАТ ===== -->
     <div class="chatBox">
         <div id="chat"></div>
 
@@ -37,7 +34,7 @@
 </div>
 
 <script>
-let myNick = "";          // ❌ НЕ сохраняем
+let myNick = "";
 let users = new Set();
 
 const chat = document.getElementById("chat");
@@ -48,45 +45,27 @@ const ws = new WebSocket(
 );
 
 ws.onmessage = (event) => {
-    let data;
-    try { data = JSON.parse(event.data); } catch { return; }
+    const data = JSON.parse(event.data);
 
-    if (data.type === "system") {
-        handleSystem(data.text);
+    if (data.type === "online") {
+        users.add(data.nick);
+        renderUsers();
+        system(`${data.nick} 🟢 онлайн`);
+        return;
+    }
+
+    if (data.type === "offline") {
+        users.delete(data.nick);
+        renderUsers();
+        system(`${data.nick} 🔴 офлайн`);
         return;
     }
 
     if (data.type === "message") {
-        users.add(data.nick);
-        renderUsers();
-
         const side = data.nick === myNick ? "me" : "other";
         addMessage(data.nick, data.text, side);
     }
 };
-
-function handleSystem(text) {
-
-    // 🟢 пользователь вошёл
-    if (text.endsWith("вошёл в чат")) {
-        const nick = text.replace(" вошёл в чат", "");
-        users.add(nick);
-        renderUsers();
-        addSystem("🟢 " + nick + " онлайн");
-        return;
-    }
-
-    // 🔴 пользователь вышел
-    if (text.endsWith("вышел из чата")) {
-        const nick = text.replace(" вышел из чата", "");
-        users.delete(nick);
-        renderUsers();
-        addSystem("🔴 " + nick + " офлайн");
-        return;
-    }
-
-    addSystem(text);
-}
 
 function setNick() {
     const input = document.getElementById("nickInput");
@@ -96,7 +75,7 @@ function setNick() {
     myNick = nick;
     ws.send("/nick " + nick);
 
-    input.value = "";                 // ❌ визуально не сохраняем
+    input.value = "";
     document.getElementById("nickBox").style.display = "none";
 }
 
@@ -108,7 +87,6 @@ function sendMessage() {
     }
 }
 
-// Enter = отправка
 document.getElementById("messageInput").addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
 });
@@ -132,7 +110,7 @@ function addMessage(nick, text, side) {
     chat.scrollTop = chat.scrollHeight;
 }
 
-function addSystem(text) {
+function system(text) {
     const div = document.createElement("div");
     div.className = "system";
     div.textContent = text;
@@ -158,123 +136,99 @@ body {
     min-height: 100vh;
     font-family: system-ui, sans-serif;
     color: #fff;
-
-    background:
-        linear-gradient(120deg,
-            rgba(140,0,255,.45),
-            rgba(0,180,255,.45),
-            rgba(255,0,140,.45)
-        );
+    background: linear-gradient(120deg,#5f2cff,#00c3ff,#ff2c9c);
     background-size: 300% 300%;
-    animation: neonMove 18s ease infinite;
+    animation: bg 18s ease infinite;
 }
 
-@keyframes neonMove {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+@keyframes bg {
+    0%{background-position:0% 50%}
+    50%{background-position:100% 50%}
+    100%{background-position:0% 50%}
 }
 
-.layout {
-    display: flex;
-    gap: 10px;
-}
+.layout { display:flex; gap:10px; }
 
 #users {
-    width: 160px;
-    background: rgba(0,0,0,.45);
-    padding: 8px;
-    border-radius: 8px;
+    width:160px;
+    background:rgba(0,0,0,.4);
+    padding:8px;
+    border-radius:8px;
 }
 
 #userList {
-    list-style: none;
-    padding: 0;
-    margin: 6px 0 0;
+    list-style:none;
+    padding:0;
 }
 
 #userList li {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
+    display:flex;
+    gap:6px;
+    align-items:center;
+    margin-bottom:4px;
 }
 
 .dot {
-    width: 8px;
-    height: 8px;
-    background: #00ff88;
-    border-radius: 50%;
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#00ff88;
 }
 
-.chatBox { flex: 1; }
+.chatBox { flex:1; }
 
 #chat {
-    height: 320px;
-    overflow-y: auto;
-    background: rgba(0,0,0,.45);
-    border-radius: 8px;
-    padding: 10px;
+    height:320px;
+    overflow-y:auto;
+    background:rgba(0,0,0,.4);
+    border-radius:8px;
+    padding:10px;
 }
 
 .msg {
-    display: flex;
-    margin-bottom: 8px;
-    animation: fadeIn .25s ease;
+    display:flex;
+    margin-bottom:8px;
 }
 
-.msg.me { flex-direction: row-reverse; }
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; }
-}
+.msg.me { flex-direction:row-reverse; }
 
 .avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgba(255,255,255,.25);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 6px;
-    font-weight: bold;
+    width:36px;
+    height:36px;
+    border-radius:50%;
+    background:rgba(255,255,255,.3);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:0 6px;
 }
 
 .bubble {
-    max-width: 65%;
-    padding: 6px 10px;
-    border-radius: 10px;
-    background: rgba(0,255,255,.35);
+    max-width:65%;
+    padding:6px 10px;
+    border-radius:10px;
+    background:rgba(0,255,255,.35);
 }
 
 .msg.other .bubble {
-    background: rgba(255,0,255,.35);
+    background:rgba(255,0,255,.35);
 }
 
 .system {
-    text-align: center;
-    font-size: 13px;
-    opacity: .8;
-    margin: 6px 0;
+    text-align:center;
+    opacity:.7;
+    font-size:13px;
+    margin:6px 0;
 }
 
 .inputBox {
-    display: flex;
-    gap: 6px;
-    margin-top: 6px;
+    display:flex;
+    gap:6px;
+    margin-top:6px;
 }
 
-input {
-    flex: 1;
-    padding: 6px;
-}
-
-button {
-    padding: 6px 12px;
-    cursor: pointer;
-}
+input { flex:1; padding:6px; }
+button { padding:6px 12px; cursor:pointer; }
 </style>
 
 </body>
