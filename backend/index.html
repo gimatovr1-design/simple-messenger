@@ -10,13 +10,11 @@
 
 <h3>Добро пожаловать в чат 👋</h3>
 
-<!-- ===== ВВОД НИКА ===== -->
 <div id="nickBox">
     <input id="nickInput" placeholder="Введите ник">
     <button onclick="setNick()">OK</button>
 </div>
 
-<!-- ===== ЧАТ ===== -->
 <div id="chat"></div>
 
 <div class="inputBox">
@@ -26,6 +24,8 @@
 
 <script>
 let myNick = "";
+let onlineUsers = new Set();
+
 let ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") +
     location.host + "/ws"
@@ -39,22 +39,21 @@ ws.onmessage = (event) => {
         return;
     }
 
-    // системные сообщения
     if (data.type === "system") {
-        addMessage(data.text, "system");
+        addSystem(data.text);
         return;
     }
 
-    // обычные сообщения
     if (data.type === "message") {
+        onlineUsers.add(data.nick);
         const side = data.nick === myNick ? "me" : "other";
-        addMessage(`${data.nick}: ${data.text}`, side);
+        addMessage(data.nick, data.text, side);
     }
 };
 
 function setNick() {
     const nick = document.getElementById("nickInput").value.trim();
-    if (nick !== "") {
+    if (nick) {
         myNick = nick;
         ws.send("/nick " + nick);
         document.getElementById("nickBox").style.display = "none";
@@ -63,30 +62,51 @@ function setNick() {
 
 function sendMessage() {
     const input = document.getElementById("messageInput");
-    if (input.value.trim() !== "") {
+    if (input.value.trim()) {
         ws.send(input.value);
         input.value = "";
     }
 }
 
-// отправка по Enter
 document.getElementById("messageInput").addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
 });
 
-function addMessage(text, type) {
-    const chat = document.getElementById("chat");
+function addSystem(text) {
     const div = document.createElement("div");
-    div.className = "msg " + type;
+    div.className = "system";
     div.textContent = text;
     chat.appendChild(div);
+}
+
+function addMessage(nick, text, side) {
+    const chat = document.getElementById("chat");
+
+    const row = document.createElement("div");
+    row.className = "row " + side;
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = nick[0].toUpperCase();
+
+    const online = document.createElement("span");
+    online.className = "online";
+    avatar.appendChild(online);
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = `<strong>${nick}</strong><br>${text}`;
+
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+
+    chat.appendChild(row);
     chat.scrollTop = chat.scrollHeight;
 }
 </script>
 
 </body>
 
-<!-- ===== СТИЛИ ===== -->
 <style>
 body {
     margin: 0;
@@ -104,11 +124,10 @@ body {
         url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee");
 
     background-size: 300% 300%, cover;
-    background-attachment: fixed;
-    animation: neonMove 20s ease infinite;
+    animation: neon 20s infinite;
 }
 
-@keyframes neonMove {
+@keyframes neon {
     0% { background-position: 0% 50%, center; }
     50% { background-position: 100% 50%, center; }
     100% { background-position: 0% 50%, center; }
@@ -117,37 +136,58 @@ body {
 #chat {
     height: 320px;
     overflow-y: auto;
-    padding: 10px;
-    margin-bottom: 8px;
     background: rgba(0,0,0,0.45);
+    padding: 10px;
     border-radius: 8px;
+    margin-bottom: 8px;
 }
 
-/* сообщения */
-.msg {
+/* ===== сообщения ===== */
+.row {
+    display: flex;
+    margin-bottom: 10px;
+    align-items: flex-end;
+}
+
+.row.me {
+    flex-direction: row-reverse;
+}
+
+.bubble {
     max-width: 70%;
-    padding: 6px 10px;
-    margin-bottom: 6px;
-    border-radius: 10px;
-    word-wrap: break-word;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(0,255,255,0.35);
 }
 
-.msg.me {
-    margin-left: auto;
-    background: rgba(0, 255, 255, 0.35);
-    text-align: right;
+.row.other .bubble {
+    background: rgba(255,0,255,0.35);
 }
 
-.msg.other {
-    margin-right: auto;
-    background: rgba(255, 0, 255, 0.35);
-    text-align: left;
+/* ===== аватар ===== */
+.avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 8px;
+    position: relative;
+    font-weight: bold;
 }
 
-.msg.system {
-    margin: 6px auto;
-    font-size: 13px;
-    opacity: 0.8;
+/* онлайн индикатор */
+.online {
+    width: 8px;
+    height: 8px;
+    background: #00ff6a;
+    border-radius: 50%;
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    box-shadow: 0 0 6px #00ff6a;
 }
 
 .inputBox {
@@ -156,14 +196,22 @@ body {
 }
 
 input {
-    padding: 6px;
     flex: 1;
+    padding: 6px;
 }
 
 button {
     padding: 6px 12px;
     cursor: pointer;
 }
+
+.system {
+    text-align: center;
+    font-size: 13px;
+    opacity: 0.7;
+    margin: 6px 0;
+}
 </style>
 
 </html>
+
