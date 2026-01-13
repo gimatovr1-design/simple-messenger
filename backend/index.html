@@ -10,13 +10,20 @@
 
 <h3>Добро пожаловать в чат 👋</h3>
 
+<!-- ===== ВВОД НИКА ===== -->
+<div id="nickBox">
+    <input id="nickInput" placeholder="Введите ник">
+    <button onclick="setNick()">OK</button>
+</div>
+
+<!-- ===== ЧАТ ===== -->
 <div id="chat"></div>
 
 <input id="messageInput" placeholder="Сообщение">
 <button onclick="sendMessage()">Отправить</button>
 
 <script>
-const ws = new WebSocket(
+let ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") +
     location.host + "/ws"
 );
@@ -26,6 +33,14 @@ ws.onmessage = (event) => {
     chat.innerHTML += `<div>${event.data}</div>`;
     chat.scrollTop = chat.scrollHeight;
 };
+
+function setNick() {
+    const nick = document.getElementById("nickInput").value.trim();
+    if (nick !== "") {
+        ws.send("/nick " + nick);
+        document.getElementById("nickBox").style.display = "none";
+    }
+}
 
 function sendMessage() {
     const input = document.getElementById("messageInput");
@@ -38,7 +53,7 @@ function sendMessage() {
 
 </body>
 
-<!-- ===== НОВОЕ ДОПОЛНЕНИЕ: АНИМИРОВАННЫЙ КИБЕРПАНК НЕОН ФОН ===== -->
+<!-- ===== СТИЛИ (ВНИЗУ, КАК ТЫ ХОТЕЛ) ===== -->
 <style>
 body {
     margin: 0;
@@ -70,5 +85,27 @@ body {
     100% { background-position: 0% 50%, center; }
 }
 
+#nickBox {
+    margin-bottom: 8px;
+}
+
 #chat {
-    heig
+    height: 300px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+    padding: 8px;
+    background: rgba(0,0,0,0.45);
+    border-radius: 6px;
+}
+
+input {
+    padding: 6px;
+}
+
+button {
+    padding: 6px 10px;
+    cursor: pointer;
+}
+</style>
+
+</html>
