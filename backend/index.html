@@ -3,83 +3,94 @@
 <head>
 <meta charset="UTF-8">
 <title>Simple Messenger</title>
+
 <style>
+* { box-sizing: border-box; }
+
 body {
     margin: 0;
     height: 100vh;
-    background: #0b0d1a;
+    background: #0f172a;
     display: flex;
-    justify-content: center;
     align-items: center;
-    font-family: sans-serif;
+    justify-content: center;
+    font-family: Arial, sans-serif;
     color: white;
 }
-#chat {
+
+.chat {
     width: 360px;
-    height: 540px;
-    background: #14162b;
-    border-radius: 16px;
-    padding: 12px;
+    height: 520px;
+    background: #020617;
+    border-radius: 14px;
     display: flex;
     flex-direction: column;
+    box-shadow: 0 0 30px rgba(0,0,0,.6);
 }
-#top {
+
+.header {
+    padding: 12px;
     text-align: center;
-    margin-bottom: 6px;
+    font-weight: bold;
+    border-bottom: 1px solid #1e293b;
+}
+
+.messages {
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+    font-size: 14px;
+}
+
+.message {
+    margin-bottom: 8px;
+}
+
+.nick {
+    color: #38bdf8;
     font-weight: bold;
 }
-#messages {
-    flex: 1;
-    overflow-y: auto;
+
+.system {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.input {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    border-top: 1px solid #1e293b;
 }
-.msg {
-    max-width: 70%;
-    padding: 8px;
-    border-radius: 10px;
-}
-.me {
-    align-self: flex-end;
-    background: #4a6cff;
-}
-.other {
-    align-self: flex-start;
-    background: #333;
-}
-.row {
-    display: flex;
-    gap: 6px;
-}
-input {
+
+.input input {
     flex: 1;
-    border-radius: 8px;
+    padding: 10px;
     border: none;
-    padding: 8px;
+    outline: none;
+    background: #020617;
+    color: white;
 }
-button {
+
+.input button {
+    padding: 0 16px;
     border: none;
-    padding: 8px 12px;
-    border-radius: 8px;
+    cursor: pointer;
+    background: #0284c7;
+    color: white;
+}
+
+.input button:hover {
+    background: #0369a1;
 }
 </style>
 </head>
+
 <body>
+<div class="chat">
+    <div class="header">💬 Simple Messenger</div>
+    <div id="messages" class="messages"></div>
 
-<div id="chat">
-    <div id="top">Ник: <span id="nickName">—</span></div>
-
-    <div class="row">
-        <input id="nick" placeholder="Ник">
-        <button onclick="setNick()">OK</button>
-    </div>
-
-    <div id="messages"></div>
-
-    <div class="row">
-        <input id="text" placeholder="Сообщение"
-        onkeydown="if(event.key==='Enter') send()">
+    <div class="input">
+        <input id="text" placeholder="/nick name или сообщение">
         <button onclick="send()">➤</button>
     </div>
 </div>
@@ -90,35 +101,35 @@ const ws = new WebSocket(
     location.host + "/ws"
 );
 
-let myNick = "";
+const messages = document.getElementById("messages");
+const input = document.getElementById("text");
 
-ws.onmessage = e => {
-    const msg = document.createElement("div");
-    msg.className = "msg";
-    if (e.data.startsWith(myNick + ":")) {
-        msg.classList.add("me");
-        msg.textContent = e.data.replace(myNick + ":", "");
+ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    const div = document.createElement("div");
+
+    if (data.type === "system") {
+        div.className = "message system";
+        div.textContent = data.text;
     } else {
-        msg.classList.add("other");
-        msg.textContent = e.data;
+        div.className = "message";
+        div.innerHTML = `<span class="nick">${data.nick}:</span> ${data.text}`;
     }
-    messages.appendChild(msg);
-    msg.scrollIntoView();
+
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
 };
 
-function setNick() {
-    myNick = nick.value.trim();
-    if (!myNick) return;
-    nickName.textContent = myNick;
-    ws.send("/nick " + myNick);
-}
-
 function send() {
-    if (!text.value) return;
-    ws.send(text.value);
-    text.value = "";
+    const text = input.value.trim();
+    if (!text) return;
+    ws.send(text);
+    input.value = "";
 }
-</script>
 
+input.addEventListener("keydown", e => {
+    if (e.key === "Enter") send();
+});
+</script>
 </body>
 </html>
