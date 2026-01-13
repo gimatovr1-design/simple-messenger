@@ -66,26 +66,33 @@ ws.onmessage = (event) => {
 
         const side = data.nick === myNick ? "me" : "other";
 
-        if (typeof data.text === "string") {
-            addMessage(data.nick, data.text, side);
+        let payload = data.text;
+
+        // ✅ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
+        if (typeof payload === "string" && payload.startsWith("{")) {
+            try { payload = JSON.parse(payload); } catch {}
+        }
+
+        if (typeof payload === "string") {
+            addMessage(data.nick, payload, side);
             return;
         }
 
-        if (data.text.type === "text") {
-            addMessage(data.nick, data.text.data, side);
+        if (payload.type === "text") {
+            addMessage(data.nick, payload.data, side);
         }
 
-        if (data.text.type === "file") {
-            if (data.text.mime.startsWith("image")) {
+        if (payload.type === "file") {
+            if (payload.mime.startsWith("image")) {
                 addMessage(
                     data.nick,
-                    `<img src="${data.text.data}" style="max-width:220px;border-radius:6px">`,
+                    `<img src="${payload.data}" style="max-width:220px;border-radius:6px">`,
                     side
                 );
-            } else if (data.text.mime.startsWith("video")) {
+            } else if (payload.mime.startsWith("video")) {
                 addMessage(
                     data.nick,
-                    `<video src="${data.text.data}" controls style="max-width:240px;border-radius:6px"></video>`,
+                    `<video src="${payload.data}" controls style="max-width:240px;border-radius:6px"></video>`,
                     side
                 );
             }
@@ -154,7 +161,7 @@ function addMessage(nick, text, side) {
 }
 
 function addSystem(text) {
-    const chat = document.getElementById("chat"); // ✅ ВОТ ЭТА СТРОКА — КЛЮЧ
+    const chat = document.getElementById("chat");
     const div = document.createElement("div");
     div.className = "system";
     div.textContent = text;
