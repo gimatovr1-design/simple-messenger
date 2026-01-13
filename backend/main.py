@@ -40,7 +40,7 @@ class ConnectionManager:
         await websocket.accept()
         self.active[websocket] = ""
 
-        # отправляем историю
+        # отправляем историю (ВАЖНО: send_text + ensure_ascii=False)
         for msg in load_messages():
             if isinstance(msg, dict):
                 await websocket.send_text(
@@ -48,7 +48,7 @@ class ConnectionManager:
                         "type": "message",
                         "nick": msg.get("nick", ""),
                         "text": msg.get("text", "")
-                    }, ensure_ascii=False)   # ✅ ВАЖНО
+                    }, ensure_ascii=False)
                 )
 
     def disconnect(self, websocket: WebSocket):
@@ -56,11 +56,12 @@ class ConnectionManager:
 
     async def broadcast(self, message: dict):
         save_message(message)
+
         payload = json.dumps({
             "type": "message",
             "nick": message["nick"],
             "text": message["text"]
-        }, ensure_ascii=False)               # ✅ ВАЖНО
+        }, ensure_ascii=False)
 
         for ws in list(self.active):
             try:
