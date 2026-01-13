@@ -74,6 +74,7 @@ body {
     padding: 8px;
     border-radius: 6px;
     border: none;
+    outline: none;
 }
 .btn {
     width: 38px;
@@ -111,7 +112,7 @@ body {
             <button class="btn" id="emojiBtn">😀</button>
             <button class="btn" id="fileBtn">📎</button>
             <input type="file" id="fileInput" hidden>
-            <input type="text" id="text" placeholder="Сообщение">
+            <input type="text" id="text" placeholder="Сообщение" autocomplete="off">
             <button class="btn send" id="send">Отправить</button>
         </div>
     </div>
@@ -141,20 +142,17 @@ const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"
 );
 
-ws.onopen = () => {
+ws.addEventListener("open", () => {
     ws.send(JSON.stringify({ type: "nick", nick }));
-};
+});
 
-ws.onmessage = e => {
+ws.addEventListener("message", e => {
     const data = JSON.parse(e.data);
 
     if (data.type === "users") {
         users.innerHTML = "";
         data.users.forEach(u => {
-            users.innerHTML += `
-                <div class="user">
-                    <span class="dot"></span>${u}
-                </div>`;
+            users.innerHTML += `<div class="user"><span class="dot"></span>${u}</div>`;
         });
     }
 
@@ -170,7 +168,7 @@ ws.onmessage = e => {
         else
             addMsg(data.nick, `<a href="${data.content}" download="${data.name}">📎 ${data.name}</a>`);
     }
-};
+});
 
 function addMsg(from, html) {
     const div = document.createElement("div");
@@ -183,12 +181,19 @@ function addMsg(from, html) {
 // ===== SEND =====
 function sendMsg() {
     if (!text.value.trim()) return;
+    if (ws.readyState !== 1) return;
     ws.send(JSON.stringify({ type: "message", text: text.value }));
     text.value = "";
 }
 
-send.onclick = sendMsg;
-text.onkeydown = e => e.key === "Enter" && sendMsg();
+send.addEventListener("click", sendMsg);
+
+text.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        sendMsg();
+    }
+});
 
 // ===== EMOJI =====
 emojiBtn.onclick = () => {
@@ -196,7 +201,10 @@ emojiBtn.onclick = () => {
         emojiPanel.style.display === "block" ? "none" : "block";
 };
 emojiPanel.onclick = e => {
-    if (e.target.nodeType === 3) text.value += e.target.textContent.trim();
+    if (e.target.nodeType === 3) {
+        text.value += e.target.textContent.trim();
+        text.focus();
+    }
 };
 
 // ===== FILE =====
@@ -217,4 +225,3 @@ fileInput.onchange = () => {
 </script>
 </body>
 </html>
-
