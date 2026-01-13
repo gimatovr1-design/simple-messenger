@@ -8,31 +8,67 @@
 
 <body>
 
-<!-- ===== ЧАТ (твой формат можешь оставить свой) ===== -->
-<div class="container">
-    <div class="chat">
-        <div class="messages" id="messages">
-            <div class="msg">Добро пожаловать в чат 👋</div>
-        </div>
+<h3>Добро пожаловать в чат 👋</h3>
 
-        <div class="input-area">
-            <input type="text" placeholder="Введите сообщение..." />
-            <button>Отправить</button>
-        </div>
-    </div>
-</div>
+<div id="chat"></div>
+
+<input id="messageInput" placeholder="Сообщение">
+<button onclick="sendMessage()">Отправить</button>
+
+<script>
+const ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") +
+    location.host + "/ws"
+);
+
+ws.onmessage = (event) => {
+    const chat = document.getElementById("chat");
+    chat.innerHTML += `<div>${event.data}</div>`;
+    chat.scrollTop = chat.scrollHeight;
+};
+
+function sendMessage() {
+    const input = document.getElementById("messageInput");
+    if (input.value.trim() !== "") {
+        ws.send(input.value);
+        input.value = "";
+    }
+}
+</script>
 
 </body>
 
-<!-- ===== ВСЕ СТИЛИ ВНИЗУ (КАК ТЫ ХОТЕЛ) ===== -->
+<!-- ===== НОВОЕ ДОПОЛНЕНИЕ: АНИМИРОВАННЫЙ КИБЕРПАНК НЕОН ФОН ===== -->
 <style>
-/* ===== ФОН: АНИМИРОВАННЫЙ НЕОН КИБЕРПАНК ГОРОД ===== */
 body {
     margin: 0;
     min-height: 100vh;
+    padding: 10px;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #fff;
 
     background:
         linear-gradient(
             120deg,
-            rgba(140, 0, 2
+            rgba(140, 0, 255, 0.45),
+            rgba(0, 180, 255, 0.45),
+            rgba(255, 0, 140, 0.45)
+        ),
+        url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee");
+
+    background-size: 300% 300%, cover;
+    background-position: 0% 50%, center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+
+    animation: neonMove 20s ease infinite;
+}
+
+@keyframes neonMove {
+    0%   { background-position: 0% 50%, center; }
+    50%  { background-position: 100% 50%, center; }
+    100% { background-position: 0% 50%, center; }
+}
+
+#chat {
+    heig
