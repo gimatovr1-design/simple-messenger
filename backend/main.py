@@ -1,84 +1,130 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
+import uvicorn
 import json
+import os
 
 app = FastAPI()
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MESSAGES_FILE = os.path.join(BASE_DIR, "messages.json")
+
+
+# ====== история ======
+def load_messages():
+    if not os.path.exists(MESSAGES_FILE):
+        return []
+    try:
+        with open(MESSAGES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return []
+
+
+def save_message(msg: dict):
+    messages = load_messages()
+    messages.append(msg)
+    with open(MESSAGES_FILE, "w", encoding="utf-8") as f:
+        json.dump(messages, f, ensure_ascii=False, indent=2)
 
 
 @app.get("/")
 async def root():
-    return FileResponse("index.html")
+    return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 
+# ====== WS MANAGER ======
 class ConnectionManager:
     def __init__(self):
-        self.users: dict[WebSocket, str] = {}
+        self.active: dict[WebSocket, str] = {}
 
     async def connect(self, ws: WebSocket):
         await ws.accept()
+        self.active[ws] = ""
 
-    def disconnect(self, ws: WebSocket):
-        if ws in self.users:
-            del self.users[ws]
+        # отправляем историю
+        for msg in load_messages():
+            await ws.send_json({
+                "type": "message",
+                "nick": msg["nick"],
+                "text": msg["text"]
+            })
 
-    async def broadcast(self, data: dict):
-        dead = []
-        for ws in self.users:
+    async def disconnect(self, ws: WebSocket):
+        nick = self.active.get(ws)
+        self.active.pop(ws, None)
+
+        if nick:
+            await self.broadcast_system(f"{nick} вышел")
+
+    async def broadcast_message(self, nick: str, text: str):
+        save_message({"nick": nick, "text": text})
+        for ws in list(self.active):
             try:
-                await ws.send_text(json.dumps(data))
+                await ws.send_json({
+                    "type": "message",
+                    "nick": nick,
+                    "text": text
+                })
             except:
-                dead.append(ws)
-        for ws in dead:
-            self.disconnect(ws)
+                self.active.pop(ws, None)
 
-    async def send_users(self):
-        await self.broadcast({
-            "type": "users",
-            "users": list(self.users.values())
-        })
+    async def broadcast_system(self, text: str):
+        for ws in list(self.active):
+            try:
+                await ws.send_json({
+                    "type": "system",
+                    "text": text
+                })
+            except:
+                self.active.pop(ws, None)
 
 
 manager = ConnectionManager()
 
 
+# ====== WEBSOCKET ======
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await manager.connect(ws)
 
     try:
         while True:
-            data = json.loads(await ws.receive_text())
+            text = (await ws.receive_text()).strip()
+            if not text:
+                continue
 
-            # ===== ник =====
-            if data["type"] == "nick":
-                manager.users[ws] = data["nick"]
-                await manager.send_users()
+            # установка ника
+            if text.startswith("/nick "):
+                nick = text.replace("/nick ", "").strip()
+                if not nick:
+                    await ws.send_json({
+                        "type": "system",
+                        "text": "❌ Ник не может быть пустым"
+                    })
+                    continue
 
-            # ===== текст =====
-            elif data["type"] == "message":
-                await manager.broadcast({
-                    "type": "message",
-                    "nick": manager.users.get(ws, "anon"),
-                    "text": data["text"]
+                manager.active[ws] = nick
+                await ws.send_json({
+                    "type": "system",
+                    "text": f"Ник установлен: {nick}"
                 })
+                await manager.broadcast_system(f"{nick} вошёл")
+                continue
 
-            # ===== файл =====
-            elif data["type"] == "file":
-                await manager.broadcast({
-                    "type": "file",
-                    "nick": manager.users.get(ws, "anon"),
-                    "name": data["name"],
-                    "mime": data["mime"],
-                    "content": data["content"]
+            nick = manager.active.get(ws)
+            if not nick:
+                await ws.send_json({
+                    "type": "system",
+                    "text": "❌ Сначала укажи ник"
                 })
+                continue
+
+            await manager.broadcast_message(nick, text)
 
     except WebSocketDisconnect:
-        manager.disconnect(ws)
-        await manager.send_users()
+        await manager.disconnect(ws)
 
 
-# ===== ЗАПУСК =====
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
+    uvicorn.run(app, host="0.0.0.0", port=8000)
