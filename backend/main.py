@@ -1,13 +1,20 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 import json
 import os
+from uuid import uuid4
 
 app = FastAPI()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MESSAGES_FILE = os.path.join(BASE_DIR, "messages.json")
+
+# ===== ПАПКА ДЛЯ ФОТО =====
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
 def load_messages():
@@ -32,6 +39,19 @@ async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 
+# ===== ЗАГРУЗКА ФОТО =====
+@app.post("/upload")
+async def upload(file: UploadFile = File(...)):
+    ext = os.path.splitext(file.filename)[1]
+    name = f"{uuid4()}{ext}"
+    path = os.path.join(UPLOAD_DIR, name)
+
+    with open(path, "wb") as f:
+        f.write(await file.read())
+
+    return {"url": f"/uploads/{name}"}
+
+
 class ConnectionManager:
     def __init__(self):
         self.active: dict[WebSocket, str] = {}
@@ -40,32 +60,27 @@ class ConnectionManager:
         await websocket.accept()
         self.active[websocket] = ""
 
-        # отправляем историю (ВАЖНО: send_text + ensure_ascii=False)
+        # отправляем историю
         for msg in load_messages():
             if isinstance(msg, dict):
-                await websocket.send_text(
-                    json.dumps({
-                        "type": "message",
-                        "nick": msg.get("nick", ""),
-                        "text": msg.get("text", "")
-                    }, ensure_ascii=False)
-                )
+                await websocket.send_json({
+                    "type": "message",
+                    "nick": msg.get("nick", ""),
+                    "text": msg.get("text", "")
+                })
 
     def disconnect(self, websocket: WebSocket):
         self.active.pop(websocket, None)
 
     async def broadcast(self, message: dict):
         save_message(message)
-
-        payload = json.dumps({
-            "type": "message",
-            "nick": message["nick"],
-            "text": message["text"]
-        }, ensure_ascii=False)
-
         for ws in list(self.active):
             try:
-                await ws.send_text(payload)
+                await ws.send_json({
+                    "type": "message",
+                    "nick": message["nick"],
+                    "text": message["text"]
+                })
             except:
                 self.disconnect(ws)
 
@@ -87,31 +102,25 @@ async def websocket_endpoint(websocket: WebSocket):
             if text.startswith("/nick "):
                 nick = text.replace("/nick ", "").strip()
                 if not nick:
-                    await websocket.send_text(
-                        json.dumps({
-                            "type": "system",
-                            "text": "❌ Ник не может быть пустым"
-                        }, ensure_ascii=False)
-                    )
+                    await websocket.send_json({
+                        "type": "system",
+                        "text": "❌ Ник не может быть пустым"
+                    })
                     continue
 
                 manager.active[websocket] = nick
-                await websocket.send_text(
-                    json.dumps({
-                        "type": "system",
-                        "text": f"✅ Ник установлен: {nick}"
-                    }, ensure_ascii=False)
-                )
+                await websocket.send_json({
+                    "type": "system",
+                    "text": f"✅ Ник установлен: {nick}"
+                })
                 continue
 
             nick = manager.active.get(websocket)
             if not nick:
-                await websocket.send_text(
-                    json.dumps({
-                        "type": "system",
-                        "text": "❌ Сначала укажи ник"
-                    }, ensure_ascii=False)
-                )
+                await websocket.send_json({
+                    "type": "system",
+                    "text": "❌ Сначала укажи ник"
+                })
                 continue
 
             await manager.broadcast({
