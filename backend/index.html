@@ -26,7 +26,7 @@
     <div id="chat"></div>
 
     <div class="inputBox">
-        <input type="file" id="fileInput" accept="image/*" hidden>
+        <input type="file" id="fileInput" accept="image/*,video/*" hidden>
         <button onclick="selectFile()">📎</button>
         <button onclick="toggleEmoji()">😄</button>
         <input id="messageInput" placeholder="Сообщение">
@@ -92,7 +92,13 @@ function addMessage(nick, text, side) {
     bubble.className = "bubble";
 
     if (text.startsWith("/uploads/")) {
-        bubble.innerHTML = `<b>${nick}</b><br><img src="${text}" style="max-width:220px;border-radius:8px">`;
+        if (text.match(/\.(mp4|webm|ogg)$/)) {
+            bubble.innerHTML = `<b>${nick}</b><br>
+            <video src="${text}" controls style="max-width:240px;border-radius:8px"></video>`;
+        } else {
+            bubble.innerHTML = `<b>${nick}</b><br>
+            <img src="${text}" style="max-width:240px;border-radius:8px">`;
+        }
     } else {
         bubble.innerHTML = `<b>${nick}</b><br>${text}`;
     }
@@ -118,7 +124,7 @@ function renderUsers() {
     });
 }
 
-// ===== ФОТО =====
+// ===== ФАЙЛЫ (ФОТО + ВИДЕО) =====
 function selectFile() {
     fileInput.click();
 }
@@ -130,17 +136,24 @@ fileInput.onchange = async () => {
     const fd = new FormData();
     fd.append("file", file);
 
-    const r = await fetch("/upload", { method:"POST", body: fd });
+    const r = await fetch("/upload", {
+        method: "POST",
+        body: fd
+    });
+
     const d = await r.json();
     ws.send(d.url);
+    fileInput.value = "";
 };
 
 // ===== ЭМОДЗИ =====
 function toggleEmoji() {
-    emojiBox.style.display = emojiBox.style.display === "none" ? "block" : "none";
+    emojiBox.style.display =
+        emojiBox.style.display === "none" ? "block" : "none";
 }
 
 emojiBox.onclick = e => {
+    if (!e.target.textContent.trim()) return;
     messageInput.value += e.target.textContent;
     emojiBox.style.display = "none";
 };
@@ -148,7 +161,9 @@ emojiBox.onclick = e => {
 
 <style>
 body {
-    margin:0; padding:10px; font-family:system-ui; color:#fff;
+    margin:0; padding:10px;
+    font-family:system-ui;
+    color:#fff;
     background: linear-gradient(120deg,#8c00ff,#00b4ff,#ff008c);
 }
 .layout { display:flex; gap:10px; }
