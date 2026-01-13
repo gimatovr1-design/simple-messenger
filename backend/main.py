@@ -11,7 +11,7 @@ app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MESSAGES_FILE = os.path.join(BASE_DIR, "messages.json")
 
-# ===== ПАПКА ДЛЯ ФОТО И ВИДЕО =====
+# ===== ПАПКА ДЛЯ ФОТО / ВИДЕО =====
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
@@ -42,23 +42,14 @@ async def root():
 # ===== ЗАГРУЗКА ФОТО И ВИДЕО =====
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
-    ext = os.path.splitext(file.filename)[1].lower()
+    ext = os.path.splitext(file.filename)[1]
     name = f"{uuid4()}{ext}"
     path = os.path.join(UPLOAD_DIR, name)
 
     with open(path, "wb") as f:
-        while True:
-            chunk = await file.read(1024 * 1024)  # 1 MB chunks
-            if not chunk:
-                break
-            f.write(chunk)
+        f.write(await file.read())
 
-    media_type = "video" if file.content_type.startswith("video") else "image"
-
-    return {
-        "url": f"/uploads/{name}",
-        "media_type": media_type
-    }
+    return {"url": f"/uploads/{name}"}
 
 
 class ConnectionManager:
@@ -72,7 +63,11 @@ class ConnectionManager:
         # отправляем историю
         for msg in load_messages():
             if isinstance(msg, dict):
-                await websocket.send_json(msg)
+                await websocket.send_json({
+                    "type": "message",   # ❗ ВАЖНО
+                    "nick": msg.get("nick", ""),
+                    "text": msg.get("text", "")
+                })
 
     def disconnect(self, websocket: WebSocket):
         self.active.pop(websocket, None)
@@ -81,7 +76,11 @@ class ConnectionManager:
         save_message(message)
         for ws in list(self.active):
             try:
-                await ws.send_json(message)
+                await ws.send_json({
+                    "type": "message",   # ❗ ВАЖНО
+                    "nick": message["nick"],
+                    "text": message["text"]
+                })
             except:
                 self.disconnect(ws)
 
@@ -124,9 +123,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
                 continue
 
-            # обычное текстовое сообщение
             await manager.broadcast({
-                "type": "text",
+                "type": "message",   # ❗ ВАЖНО
                 "nick": nick,
                 "text": text
             })
@@ -137,3 +135,4 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
