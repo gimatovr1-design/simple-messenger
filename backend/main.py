@@ -1,16 +1,16 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 import json
-import base64
 
 app = FastAPI()
+
 
 @app.get("/")
 async def root():
     return FileResponse("index.html")
 
 
-class Manager:
+class ConnectionManager:
     def __init__(self):
         self.users: dict[WebSocket, str] = {}
 
@@ -38,11 +38,11 @@ class Manager:
         })
 
 
-manager = Manager()
+manager = ConnectionManager()
 
 
 @app.websocket("/ws")
-async def ws_endpoint(ws: WebSocket):
+async def websocket_endpoint(ws: WebSocket):
     await manager.connect(ws)
 
     try:
@@ -55,7 +55,7 @@ async def ws_endpoint(ws: WebSocket):
                 await manager.send_users()
 
             # ===== текст =====
-            if data["type"] == "message":
+            elif data["type"] == "message":
                 await manager.broadcast({
                     "type": "message",
                     "nick": manager.users.get(ws, "anon"),
@@ -63,7 +63,7 @@ async def ws_endpoint(ws: WebSocket):
                 })
 
             # ===== файл =====
-            if data["type"] == "file":
+            elif data["type"] == "file":
                 await manager.broadcast({
                     "type": "file",
                     "nick": manager.users.get(ws, "anon"),
@@ -75,3 +75,10 @@ async def ws_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(ws)
         await manager.send_users()
+
+
+# ===== ЗАПУСК =====
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+

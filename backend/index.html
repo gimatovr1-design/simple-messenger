@@ -1,17 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Simple Messenger</title>
+
+<style>
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    height: 100vh;
+    background: radial-gradient(circle at top, #1a2a3a, #050b12);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: Arial, sans-serif;
+    color: #fff;
+}
+
+.chat {
+    width: 820px;
+    height: 520px;
+    display: flex;
+    background: rgba(10,15,20,0.85);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 200px;
+    background: rgba(0,0,0,0.35);
+    padding: 10px;
+}
+.user {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #00ff88;
+}
+
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.messages {
+    flex: 1;
+    padding: 12px;
+    overflow-y: auto;
+}
+.msg {
+    max-width: 60%;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+}
+.me { margin-left: auto; background: #7f5af0; }
+.other { margin-right: auto; background: rgba(255,255,255,0.15); }
+.nick { font-size: 11px; opacity: 0.7; }
+
+.input {
+    display: flex;
+    gap: 6px;
+    padding: 10px;
+    background: rgba(0,0,0,0.35);
+}
+.input input {
+    flex: 1;
+    padding: 8px;
+    border-radius: 6px;
+    border: none;
+}
+.btn {
+    width: 38px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    background: #1f2937;
+    color: #fff;
+}
+.send { width: 90px; background: #2563eb; }
+
+.emoji-panel {
+    position: absolute;
+    bottom: 70px;
+    right: 260px;
+    background: #111;
+    border-radius: 8px;
+    padding: 8px;
+    display: none;
+    width: 200px;
+}
+</style>
+</head>
+<body>
+
+<div class="chat">
+    <div class="sidebar">
+        <h3>Онлайн</h3>
+        <div id="users"></div>
+    </div>
+
+    <div class="main">
+        <div class="messages" id="messages"></div>
+        <div class="input">
+            <button class="btn" id="emojiBtn">😀</button>
+            <button class="btn" onclick="fileInput.click()">📎</button>
+            <input type="file" id="fileInput" hidden>
+            <input type="text" id="text" placeholder="Сообщение">
+            <button class="btn send" id="send">Отправить</button>
+        </div>
+    </div>
+</div>
+
+<div class="emoji-panel" id="emojiPanel">
+😀 😁 😂 🤣 😎 😍 🤖 🔥 🚀 💜 👍 👀 😡 😢 🎉
+</div>
+
 <script>
-const text = document.getElementById("text");
-const messages = document.getElementById("messages");
-const users = document.getElementById("users");
-const emojiBtn = document.getElementById("emojiBtn");
-const emojiPanel = document.getElementById("emojiPanel");
-const fileInput = document.getElementById("fileInput");
-
-let nick = "";
-while (!nick) nick = prompt("Введите ник");
-
 const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"
 );
+
+let nick = "";
+while (!nick) nick = prompt("Введите ник");
 
 ws.onopen = () => {
     ws.send(JSON.stringify({ type: "nick", nick }));
@@ -20,40 +136,24 @@ ws.onopen = () => {
 ws.onmessage = e => {
     const data = JSON.parse(e.data);
 
-    // ===== онлайн =====
     if (data.type === "users") {
         users.innerHTML = "";
         data.users.forEach(u => {
-            const d = document.createElement("div");
-            d.className = "user";
-            d.innerHTML = `<span class="dot"></span>${u}`;
-            users.appendChild(d);
+            users.innerHTML += `<div class="user"><span class="dot"></span>${u}</div>`;
         });
     }
 
-    // ===== текст =====
     if (data.type === "message") {
         addMsg(data.nick, data.text);
     }
 
-    // ===== файл =====
     if (data.type === "file") {
-        if (data.mime.startsWith("image")) {
-            addMsg(
-                data.nick,
-                `<img src="${data.content}" style="max-width:200px;border-radius:8px">`
-            );
-        } else if (data.mime.startsWith("video")) {
-            addMsg(
-                data.nick,
-                `<video controls src="${data.content}" style="max-width:220px"></video>`
-            );
-        } else {
-            addMsg(
-                data.nick,
-                `<a href="${data.content}" download="${data.name}">📎 ${data.name}</a>`
-            );
-        }
+        if (data.mime.startsWith("image"))
+            addMsg(data.nick, `<img src="${data.content}" style="max-width:200px">`);
+        else if (data.mime.startsWith("video"))
+            addMsg(data.nick, `<video controls src="${data.content}" style="max-width:200px"></video>`);
+        else
+            addMsg(data.nick, `<a href="${data.content}" download="${data.name}">📎 ${data.name}</a>`);
     }
 };
 
@@ -65,42 +165,36 @@ function addMsg(from, html) {
     messages.scrollTop = messages.scrollHeight;
 }
 
-// ===== отправка текста =====
-function sendMsg() {
+send.onclick = () => {
     if (!text.value.trim()) return;
     ws.send(JSON.stringify({ type: "message", text: text.value }));
     text.value = "";
-}
+};
 
-send.onclick = sendMsg;
-text.onkeydown = e => e.key === "Enter" && sendMsg();
+text.onkeydown = e => e.key === "Enter" && send.onclick();
 
-// ===== эмодзи =====
 emojiBtn.onclick = () => {
     emojiPanel.style.display =
-        emojiPanel.style.display === "flex" ? "none" : "flex";
+        emojiPanel.style.display === "block" ? "none" : "block";
 };
 
 emojiPanel.onclick = e => {
-    if (e.target.nodeType === 3) {
-        text.value += e.target.textContent.trim();
-    }
+    if (e.target.nodeType === 3) text.value += e.target.textContent.trim();
 };
 
-// ===== файл =====
 fileInput.onchange = () => {
-    const file = fileInput.files[0];
-    const reader = new FileReader();
-
-    reader.onload = () => {
+    const f = fileInput.files[0];
+    const r = new FileReader();
+    r.onload = () => {
         ws.send(JSON.stringify({
             type: "file",
-            name: file.name,
-            mime: file.type,
-            content: reader.result
+            name: f.name,
+            mime: f.type,
+            content: r.result
         }));
     };
-
-    reader.readAsDataURL(file);
+    r.readAsDataURL(f);
 };
 </script>
+</body>
+</html>
