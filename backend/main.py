@@ -43,18 +43,17 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_text()
             data = data.strip()
+
             if not data:
                 continue
 
-            # установка ника
             if data.startswith("/nick "):
                 nick = data.replace("/nick ", "").strip()
                 if not nick:
                     await websocket.send_text("❌ Ник не может быть пустым")
                     continue
-
                 manager.active[websocket] = nick
-                await websocket.send_text(f"✅ Ник установлен: {nick}")
+                await websocket.send_text(f"Ник установлен: {nick}")
                 continue
 
             nick = manager.active.get(websocket)

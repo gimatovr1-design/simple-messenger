@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Simple Messenger</title>
+<title>Mini Chat</title>
 
 <style>
 * { box-sizing: border-box; }
@@ -10,25 +10,37 @@
 body {
     margin: 0;
     height: 100vh;
-    background: radial-gradient(circle at top, #1b1f3b, #0b0d1a);
-    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #1b1f3b, #0b0d1a);
     display: flex;
     justify-content: center;
     align-items: center;
+    font-family: system-ui, sans-serif;
     color: white;
 }
 
 #chat {
-    width: 380px;
-    height: 560px;
+    width: 360px;
+    height: 520px;
     background: rgba(255,255,255,0.08);
     backdrop-filter: blur(14px);
     border-radius: 18px;
-    padding: 14px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
+    box-shadow: 0 0 35px rgba(0,0,0,0.6);
 }
 
+/* ===== верх с ником ===== */
+#header {
+    text-align: center;
+    font-weight: 600;
+    padding: 6px 0 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    margin-bottom: 6px;
+    opacity: 0.9;
+}
+
+/* ===== сообщения ===== */
 #messages {
     flex: 1;
     overflow-y: auto;
@@ -41,20 +53,26 @@ body {
     max-width: 75%;
     padding: 8px 12px;
     border-radius: 12px;
+    animation: fade 0.2s ease;
     word-wrap: break-word;
 }
 
 .msg.me {
     align-self: flex-end;
     background: linear-gradient(135deg, #4a6cff, #6c8bff);
-    text-align: right;
 }
 
 .msg.other {
     align-self: flex-start;
-    background: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.18);
 }
 
+@keyframes fade {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== панели ===== */
 .row {
     display: flex;
     gap: 6px;
@@ -63,19 +81,19 @@ body {
 
 input {
     flex: 1;
-    background: rgba(0,0,0,0.35);
     border: none;
     border-radius: 10px;
     padding: 10px;
+    background: rgba(0,0,0,0.35);
     color: white;
     outline: none;
 }
 
 button {
-    background: linear-gradient(135deg, #4a6cff, #6c8bff);
     border: none;
     border-radius: 10px;
     padding: 10px 14px;
+    background: linear-gradient(135deg, #4a6cff, #6c8bff);
     color: white;
     cursor: pointer;
 }
@@ -86,13 +104,19 @@ button {
 
 <div id="chat">
 
+    <!-- НИК СВЕРХУ -->
+    <div id="header">Ник: —</div>
+
+    <!-- ввод ника -->
     <div class="row">
         <input id="nick" placeholder="Введите ник">
         <button onclick="setNick()">OK</button>
     </div>
 
+    <!-- сообщения -->
     <div id="messages"></div>
 
+    <!-- ввод сообщения -->
     <div class="row">
         <input id="text" placeholder="Сообщение"
                onkeydown="if(event.key==='Enter') sendMessage()">
@@ -102,8 +126,10 @@ button {
 </div>
 
 <script>
-const protocol = location.protocol === "https:" ? "wss" : "ws";
-const ws = new WebSocket(`${protocol}://${location.host}/ws`);
+const ws = new WebSocket(
+    (location.protocol === "https:" ? "wss" : "ws") +
+    "://" + location.host + "/ws"
+);
 
 let myNick = "";
 
@@ -125,16 +151,19 @@ ws.onmessage = (e) => {
 };
 
 function setNick() {
-    const nick = document.getElementById("nick").value.trim();
-    if (!nick) return;
-    myNick = nick;
-    ws.send("/nick " + nick);
+    const n = document.getElementById("nick").value.trim();
+    if (!n) return;
+
+    myNick = n;
+    document.getElementById("header").textContent = "Ник: " + n;
+    ws.send("/nick " + n);
 }
 
 function sendMessage() {
     const input = document.getElementById("text");
     const text = input.value.trim();
     if (!text) return;
+
     ws.send(text);
     input.value = "";
 }
