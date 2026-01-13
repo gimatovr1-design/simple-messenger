@@ -10,32 +10,33 @@
 
 <h3>Добро пожаловать в чат 👋</h3>
 
-<!-- ===== ВВОД НИКА ===== -->
 <div id="nickBox">
-    <input id="nickInput" placeholder="Введите ник" autocomplete="off">
+    <input id="nickInput" placeholder="Введите ник">
     <button onclick="setNick()">OK</button>
 </div>
 
 <div class="layout">
 
-    <!-- ===== СПИСОК ОНЛАЙН ===== -->
-    <div id="users">
-        <b>Онлайн</b>
-        <ul id="userList"></ul>
+<div id="users">
+    <b>Онлайн</b>
+    <ul id="userList"></ul>
+</div>
+
+<div class="chatBox">
+    <div id="chat"></div>
+
+    <div class="inputBox">
+        <input type="file" id="fileInput" accept="image/*" hidden>
+        <button onclick="selectFile()">📎</button>
+        <button onclick="toggleEmoji()">😄</button>
+        <input id="messageInput" placeholder="Сообщение">
+        <button onclick="sendMessage()">Отправить</button>
     </div>
 
-    <!-- ===== ЧАТ ===== -->
-    <div class="chatBox">
-        <div id="chat"></div>
-
-        <div class="inputBox">
-            <input type="file" id="fileInput" accept="image/*" style="display:none">
-            <button onclick="selectFile()">📎</button>
-
-            <input id="messageInput" placeholder="Сообщение">
-            <button onclick="sendMessage()">Отправить</button>
-        </div>
+    <div id="emojiBox" style="display:none">
+        😀 😁 😂 🤣 😊 😍 😎 😭 😡 👍 👎 ❤️ 🔥 🎉
     </div>
+</div>
 
 </div>
 
@@ -53,234 +54,114 @@ ws.onmessage = (event) => {
     try { data = JSON.parse(event.data); } catch { return; }
 
     if (data.type === "system") {
-        handleSystem(data.text);
+        addSystem(data.text);
         return;
     }
 
     if (data.type === "message") {
         users.add(data.nick);
         renderUsers();
-
-        const side = data.nick === myNick ? "me" : "other";
-        addMessage(data.nick, data.text, side);
+        addMessage(data.nick, data.text, data.nick === myNick ? "me" : "other");
     }
 };
 
-function handleSystem(text) {
-    if (text.includes("Ник установлен")) {
-        addSystem(text);
-        return;
-    }
-
-    if (text.includes("вошёл")) {
-        const nick = text.split(" ")[0];
-        users.add(nick);
-        renderUsers();
-        addSystem("🟢 " + text);
-        return;
-    }
-
-    if (text.includes("вышел")) {
-        const nick = text.split(" ")[0];
-        users.delete(nick);
-        renderUsers();
-        addSystem("🔴 " + text);
-        return;
-    }
-
-    addSystem(text);
-}
-
 function setNick() {
-    const nick = document.getElementById("nickInput").value.trim();
+    const nick = nickInput.value.trim();
     if (!nick) return;
-
     myNick = nick;
     ws.send("/nick " + nick);
-    document.getElementById("nickBox").style.display = "none";
+    nickBox.style.display = "none";
 }
 
 function sendMessage() {
-    const input = document.getElementById("messageInput");
-    if (input.value.trim()) {
-        ws.send(input.value);
-        input.value = "";
-    }
+    const v = messageInput.value.trim();
+    if (!v) return;
+    ws.send(v);
+    messageInput.value = "";
 }
 
-document.getElementById("messageInput").addEventListener("keydown", e => {
+messageInput.addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
 });
 
 function addMessage(nick, text, side) {
-    const chat = document.getElementById("chat");
-
     const msg = document.createElement("div");
     msg.className = "msg " + side;
-
-    const avatar = document.createElement("div");
-    avatar.className = "avatar";
-    avatar.textContent = nick[0].toUpperCase();
 
     const bubble = document.createElement("div");
     bubble.className = "bubble";
 
     if (text.startsWith("/uploads/")) {
-        bubble.innerHTML = `<b>${nick}</b><br>
-        <img src="${text}" style="max-width:220px;border-radius:8px">`;
+        bubble.innerHTML = `<b>${nick}</b><br><img src="${text}" style="max-width:220px;border-radius:8px">`;
     } else {
         bubble.innerHTML = `<b>${nick}</b><br>${text}`;
     }
 
-    msg.appendChild(avatar);
     msg.appendChild(bubble);
-
     chat.appendChild(msg);
     chat.scrollTop = chat.scrollHeight;
 }
 
 function addSystem(text) {
-    const div = document.createElement("div");
-    div.className = "system";
-    div.textContent = text;
-    chat.appendChild(div);
+    const d = document.createElement("div");
+    d.className = "system";
+    d.textContent = text;
+    chat.appendChild(d);
 }
 
 function renderUsers() {
-    const list = document.getElementById("userList");
-    list.innerHTML = "";
-    users.forEach(nick => {
+    userList.innerHTML = "";
+    users.forEach(u => {
         const li = document.createElement("li");
-        li.innerHTML = `<span class="dot"></span>${nick}`;
-        list.appendChild(li);
+        li.textContent = u;
+        userList.appendChild(li);
     });
 }
 
-// ===== ЗАГРУЗКА ФОТО =====
+// ===== ФОТО =====
 function selectFile() {
-    document.getElementById("fileInput").click();
+    fileInput.click();
 }
 
-document.getElementById("fileInput").addEventListener("change", async function () {
-    const file = this.files[0];
+fileInput.onchange = async () => {
+    const file = fileInput.files[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append("file", file);
+    const fd = new FormData();
+    fd.append("file", file);
 
-    const res = await fetch("/upload", {
-        method: "POST",
-        body: formData
-    });
+    const r = await fetch("/upload", { method:"POST", body: fd });
+    const d = await r.json();
+    ws.send(d.url);
+};
 
-    const data = await res.json();
-    ws.send(data.url);
+// ===== ЭМОДЗИ =====
+function toggleEmoji() {
+    emojiBox.style.display = emojiBox.style.display === "none" ? "block" : "none";
+}
 
-    this.value = "";
-});
+emojiBox.onclick = e => {
+    messageInput.value += e.target.textContent;
+    emojiBox.style.display = "none";
+};
 </script>
 
 <style>
 body {
-    margin: 0;
-    padding: 10px;
-    min-height: 100vh;
-    font-family: system-ui, sans-serif;
-    color: #fff;
-    background:
-        linear-gradient(120deg,
-            rgba(140,0,255,.45),
-            rgba(0,180,255,.45),
-            rgba(255,0,140,.45)
-        ),
-        url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee");
-    background-size: 300% 300%, cover;
-    background-attachment: fixed;
-    animation: neonMove 20s ease infinite;
+    margin:0; padding:10px; font-family:system-ui; color:#fff;
+    background: linear-gradient(120deg,#8c00ff,#00b4ff,#ff008c);
 }
-
-@keyframes neonMove {
-    0% { background-position: 0% 50%, center; }
-    50% { background-position: 100% 50%, center; }
-    100% { background-position: 0% 50%, center; }
-}
-
-.layout { display: flex; gap: 10px; }
-
-#users {
-    width: 160px;
-    background: rgba(0,0,0,.45);
-    padding: 8px;
-    border-radius: 8px;
-}
-
-#userList { list-style: none; padding: 0; margin: 6px 0 0; }
-
-#userList li {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-}
-
-.dot {
-    width: 8px;
-    height: 8px;
-    background: #00ff88;
-    border-radius: 50%;
-}
-
-.chatBox { flex: 1; }
-
-#chat {
-    height: 320px;
-    overflow-y: auto;
-    background: rgba(0,0,0,.45);
-    border-radius: 8px;
-    padding: 10px;
-}
-
-.msg { display: flex; margin-bottom: 8px; }
-.msg.me { flex-direction: row-reverse; }
-
-.avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgba(255,255,255,.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 6px;
-    font-weight: bold;
-}
-
-.bubble {
-    max-width: 65%;
-    padding: 6px 10px;
-    border-radius: 10px;
-    background: rgba(0,255,255,.35);
-}
-
-.msg.other .bubble { background: rgba(255,0,255,.35); }
-
-.system {
-    text-align: center;
-    font-size: 13px;
-    opacity: .8;
-    margin: 6px 0;
-}
-
-.inputBox {
-    display: flex;
-    gap: 6px;
-    margin-top: 6px;
-}
-
-input { flex: 1; padding: 6px; }
-button { padding: 6px 12px; cursor: pointer; }
+.layout { display:flex; gap:10px; }
+#users { width:150px; background:#0006; padding:8px; }
+.chatBox { flex:1; }
+#chat { height:320px; overflow:auto; background:#0006; padding:10px; }
+.msg { margin-bottom:6px; }
+.msg.me { text-align:right; }
+.bubble { display:inline-block; padding:6px 10px; background:#0ff6; border-radius:8px; }
+.system { text-align:center; opacity:.7; }
+.inputBox { display:flex; gap:5px; margin-top:5px; }
+#emojiBox { background:#0008; padding:6px; cursor:pointer; }
 </style>
 
 </body>
 </html>
-
