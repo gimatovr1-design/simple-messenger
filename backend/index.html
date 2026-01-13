@@ -109,7 +109,7 @@ body {
         <div class="messages" id="messages"></div>
         <div class="input">
             <button class="btn" id="emojiBtn">😀</button>
-            <button class="btn" onclick="fileInput.click()">📎</button>
+            <button class="btn" id="fileBtn">📎</button>
             <input type="file" id="fileInput" hidden>
             <input type="text" id="text" placeholder="Сообщение">
             <button class="btn send" id="send">Отправить</button>
@@ -122,12 +122,24 @@ body {
 </div>
 
 <script>
+// ===== DOM =====
+const users = document.getElementById("users");
+const messages = document.getElementById("messages");
+const text = document.getElementById("text");
+const send = document.getElementById("send");
+const emojiBtn = document.getElementById("emojiBtn");
+const emojiPanel = document.getElementById("emojiPanel");
+const fileBtn = document.getElementById("fileBtn");
+const fileInput = document.getElementById("fileInput");
+
+// ===== NICK =====
+let nick = "";
+while (!nick) nick = prompt("Введите ник");
+
+// ===== WS =====
 const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"
 );
-
-let nick = "";
-while (!nick) nick = prompt("Введите ник");
 
 ws.onopen = () => {
     ws.send(JSON.stringify({ type: "nick", nick }));
@@ -139,7 +151,10 @@ ws.onmessage = e => {
     if (data.type === "users") {
         users.innerHTML = "";
         data.users.forEach(u => {
-            users.innerHTML += `<div class="user"><span class="dot"></span>${u}</div>`;
+            users.innerHTML += `
+                <div class="user">
+                    <span class="dot"></span>${u}
+                </div>`;
         });
     }
 
@@ -165,23 +180,27 @@ function addMsg(from, html) {
     messages.scrollTop = messages.scrollHeight;
 }
 
-send.onclick = () => {
+// ===== SEND =====
+function sendMsg() {
     if (!text.value.trim()) return;
     ws.send(JSON.stringify({ type: "message", text: text.value }));
     text.value = "";
-};
+}
 
-text.onkeydown = e => e.key === "Enter" && send.onclick();
+send.onclick = sendMsg;
+text.onkeydown = e => e.key === "Enter" && sendMsg();
 
+// ===== EMOJI =====
 emojiBtn.onclick = () => {
     emojiPanel.style.display =
         emojiPanel.style.display === "block" ? "none" : "block";
 };
-
 emojiPanel.onclick = e => {
     if (e.target.nodeType === 3) text.value += e.target.textContent.trim();
 };
 
+// ===== FILE =====
+fileBtn.onclick = () => fileInput.click();
 fileInput.onchange = () => {
     const f = fileInput.files[0];
     const r = new FileReader();
@@ -198,3 +217,4 @@ fileInput.onchange = () => {
 </script>
 </body>
 </html>
+
