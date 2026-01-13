@@ -5,41 +5,36 @@
 <title>Simple Messenger</title>
 
 <style>
-* { box-sizing: border-box; }
-
 body {
-    margin: 0;
-    height: 100vh;
-    background: linear-gradient(135deg, #1b1f3b, #0b0d1a);
+    background: #0f172a;
+    font-family: Arial, sans-serif;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-family: system-ui, sans-serif;
-    color: white;
+    height: 100vh;
+    margin: 0;
 }
 
-#chat {
+.chat {
     width: 360px;
     height: 520px;
-    background: rgba(255,255,255,0.08);
-    backdrop-filter: blur(14px);
-    border-radius: 18px;
-    padding: 12px;
+    background: #020617;
+    border-radius: 14px;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 0 35px rgba(0,0,0,0.6);
+    color: #e5e7eb;
 }
 
-#header {
+.header {
+    padding: 12px;
     text-align: center;
-    font-weight: 600;
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.15);
-    margin-bottom: 6px;
+    border-bottom: 1px solid #1e293b;
+    font-weight: bold;
 }
 
-#messages {
+.messages {
     flex: 1;
+    padding: 10px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -48,117 +43,92 @@ body {
 
 .msg {
     max-width: 75%;
-    padding: 8px 12px;
-    border-radius: 12px;
-    word-wrap: break-word;
-    animation: fade 0.2s ease;
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 14px;
 }
 
-.msg.me {
-    align-self: flex-end;
-    background: linear-gradient(135deg, #4a6cff, #6c8bff);
-}
-
-.msg.other {
+.left {
+    background: #1e293b;
     align-self: flex-start;
-    background: rgba(255,255,255,0.18);
 }
 
-@keyframes fade {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+.right {
+    background: #2563eb;
+    align-self: flex-end;
 }
 
-.row {
+.input {
     display: flex;
-    gap: 6px;
-    margin-top: 6px;
+    border-top: 1px solid #1e293b;
 }
 
 input {
     flex: 1;
     padding: 10px;
+    background: #020617;
     border: none;
-    border-radius: 10px;
-    background: rgba(0,0,0,0.35);
     color: white;
     outline: none;
 }
 
 button {
-    padding: 10px 14px;
+    padding: 10px;
+    background: #2563eb;
     border: none;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #4a6cff, #6c8bff);
     color: white;
     cursor: pointer;
 }
 </style>
 </head>
-
 <body>
 
-<div id="chat">
-
-    <div id="header">Ник: —</div>
-
-    <div class="row">
-        <input id="nick" placeholder="Введите ник">
-        <button onclick="setNick()">OK</button>
+<div class="chat">
+    <div class="header" id="nick">Ник не задан</div>
+    <div class="messages" id="messages"></div>
+    <div class="input">
+        <input id="text" placeholder="Сообщение..." />
+        <button onclick="send()">➤</button>
     </div>
-
-    <div id="messages"></div>
-
-    <div class="row">
-        <input id="text" placeholder="Сообщение"
-               onkeydown="if(event.key==='Enter') sendMessage()">
-        <button onclick="sendMessage()">➤</button>
-    </div>
-
 </div>
 
 <script>
 const ws = new WebSocket(
-    (location.protocol === "https:" ? "wss" : "ws") +
-    "://" + location.host + "/ws"
+    (location.protocol === "https:" ? "wss://" : "ws://")
+    + location.host + "/ws"
 );
 
 let myNick = "";
 
-ws.onmessage = (e) => {
-    const text = e.data;
-    const msg = document.createElement("div");
-    msg.classList.add("msg");
-
-    if (myNick && text.startsWith(myNick + ":")) {
-        msg.classList.add("me");
-        msg.textContent = text.replace(myNick + ":", "").trim();
-    } else {
-        msg.classList.add("other");
-        msg.textContent = text;
+ws.onmessage = e => {
+    if (e.data.startsWith("__nick__:")) {
+        myNick = e.data.split(":")[1];
+        document.getElementById("nick").innerText = myNick;
+        return;
     }
 
-    document.getElementById("messages").appendChild(msg);
-    msg.scrollIntoView({ behavior: "smooth" });
+    const [nick, text] = e.data.split(":", 2);
+
+    const div = document.createElement("div");
+    div.className = "msg " + (nick === myNick ? "right" : "left");
+    div.innerText = `${nick}: ${text}`;
+
+    const box = document.getElementById("messages");
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
 };
 
-function setNick() {
-    const n = document.getElementById("nick").value.trim();
-    if (!n) return;
-
-    myNick = n;
-    document.getElementById("header").textContent = "Ник: " + n;
-    ws.send("/nick " + n);
-}
-
-function sendMessage() {
+function send() {
     const input = document.getElementById("text");
-    const text = input.value.trim();
-    if (!text) return;
-
-    ws.send(text);
-    input.value = "";
+    if (input.value.trim()) {
+        ws.send(input.value);
+        input.value = "";
+    }
 }
+
+document.getElementById("text").addEventListener("keydown", e => {
+    if (e.key === "Enter") send();
+});
 </script>
 
 </body>
