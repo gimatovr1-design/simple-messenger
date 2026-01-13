@@ -5,178 +5,74 @@
 <title>Simple Messenger</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-
 <body>
 
-<h3>Добро пожаловать в чат 👋</h3>
+<h3>Чат 👋</h3>
 
-<div id="nickBox">
-    <input id="nickInput" placeholder="Введите ник">
-    <button onclick="setNick()">OK</button>
-</div>
+<input id="nick" placeholder="Ник">
+<button onclick="setNick()">OK</button>
 
-<div class="layout">
+<div id="chat" style="height:300px;overflow:auto;border:1px solid #444;"></div>
 
-<div id="users">
-    <b>Онлайн</b>
-    <ul id="userList"></ul>
-</div>
-
-<div class="chatBox">
-    <div id="chat"></div>
-
-    <div class="inputBox">
-        <input type="file" id="fileInput" accept="image/*,video/*" hidden>
-        <button onclick="selectFile()">📎</button>
-        <button onclick="toggleEmoji()">😄</button>
-        <input id="messageInput" placeholder="Сообщение">
-        <button onclick="sendMessage()">Отправить</button>
-    </div>
-
-    <div id="emojiBox" style="display:none">
-        😀 😁 😂 🤣 😊 😍 😎 😭 😡 👍 👎 ❤️ 🔥 🎉
-    </div>
-</div>
-
-</div>
+<input id="text">
+<input type="file" id="file">
+<button onclick="send()">Отправить</button>
 
 <script>
 let myNick = "";
-let users = new Set();
-
-let ws = new WebSocket(
-    (location.protocol === "https:" ? "wss://" : "ws://") +
-    location.host + "/ws"
+const ws = new WebSocket(
+ (location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws"
 );
 
-ws.onmessage = (event) => {
-    let data;
-    try { data = JSON.parse(event.data); } catch { return; }
-
-    if (data.type === "system") {
-        addSystem(data.text);
-        return;
-    }
-
-    if (data.type === "message") {
-        users.add(data.nick);
-        renderUsers();
-        addMessage(data.nick, data.text, data.nick === myNick ? "me" : "other");
-    }
+ws.onmessage = e => {
+ const d = JSON.parse(e.data);
+ if (d.type === "system") add("⚙️ "+d.text);
+ if (d.type === "message") render(d);
 };
 
-function setNick() {
-    const nick = nickInput.value.trim();
-    if (!nick) return;
-    myNick = nick;
-    ws.send("/nick " + nick);
-    nickBox.style.display = "none";
+function setNick(){
+ myNick = nick.value;
+ ws.send("/nick "+myNick);
 }
 
-function sendMessage() {
-    const v = messageInput.value.trim();
-    if (!v) return;
-    ws.send(v);
-    messageInput.value = "";
+function send(){
+ if(text.value){
+  ws.send(JSON.stringify({type:"text",data:text.value}));
+  text.value="";
+ }
+ if(file.files[0]){
+  const r=new FileReader();
+  r.onload=()=>ws.send(JSON.stringify({
+   type:"file",
+   name:file.files[0].name,
+   mime:file.files[0].type,
+   data:r.result
+  }));
+  r.readAsDataURL(file.files[0]);
+  file.value="";
+ }
 }
 
-messageInput.addEventListener("keydown", e => {
-    if (e.key === "Enter") sendMessage();
-});
-
-function addMessage(nick, text, side) {
-    const msg = document.createElement("div");
-    msg.className = "msg " + side;
-
-    const bubble = document.createElement("div");
-    bubble.className = "bubble";
-
-    if (text.startsWith("/uploads/")) {
-        if (text.match(/\.(mp4|webm|ogg)$/)) {
-            bubble.innerHTML = `<b>${nick}</b><br>
-            <video src="${text}" controls style="max-width:240px;border-radius:8px"></video>`;
-        } else {
-            bubble.innerHTML = `<b>${nick}</b><br>
-            <img src="${text}" style="max-width:240px;border-radius:8px">`;
-        }
-    } else {
-        bubble.innerHTML = `<b>${nick}</b><br>${text}`;
-    }
-
-    msg.appendChild(bubble);
-    chat.appendChild(msg);
-    chat.scrollTop = chat.scrollHeight;
+function render(d){
+ if(d.text.type==="text"){
+  add(`<b>${d.nick}:</b> ${d.text.data}`);
+ }
+ if(d.text.type==="file"){
+  if(d.text.mime.startsWith("image"))
+   add(`<b>${d.nick}:</b><br><img src="${d.text.data}" width=200>`);
+  else if(d.text.mime.startsWith("video"))
+   add(`<b>${d.nick}:</b><br><video src="${d.text.data}" controls width=240>`);
+ }
 }
 
-function addSystem(text) {
-    const d = document.createElement("div");
-    d.className = "system";
-    d.textContent = text;
-    chat.appendChild(d);
+function add(html){
+ const div=document.createElement("div");
+ div.innerHTML=html;
+ chat.appendChild(div);
+ chat.scrollTop=chat.scrollHeight;
 }
-
-function renderUsers() {
-    userList.innerHTML = "";
-    users.forEach(u => {
-        const li = document.createElement("li");
-        li.textContent = u;
-        userList.appendChild(li);
-    });
-}
-
-// ===== ФАЙЛЫ (ФОТО + ВИДЕО) =====
-function selectFile() {
-    fileInput.click();
-}
-
-fileInput.onchange = async () => {
-    const file = fileInput.files[0];
-    if (!file) return;
-
-    const fd = new FormData();
-    fd.append("file", file);
-
-    const r = await fetch("/upload", {
-        method: "POST",
-        body: fd
-    });
-
-    const d = await r.json();
-    ws.send(d.url);
-    fileInput.value = "";
-};
-
-// ===== ЭМОДЗИ =====
-function toggleEmoji() {
-    emojiBox.style.display =
-        emojiBox.style.display === "none" ? "block" : "none";
-}
-
-emojiBox.onclick = e => {
-    if (!e.target.textContent.trim()) return;
-    messageInput.value += e.target.textContent;
-    emojiBox.style.display = "none";
-};
 </script>
-
-<style>
-body {
-    margin:0; padding:10px;
-    font-family:system-ui;
-    color:#fff;
-    background: linear-gradient(120deg,#8c00ff,#00b4ff,#ff008c);
-}
-.layout { display:flex; gap:10px; }
-#users { width:150px; background:#0006; padding:8px; }
-.chatBox { flex:1; }
-#chat { height:320px; overflow:auto; background:#0006; padding:10px; }
-.msg { margin-bottom:6px; }
-.msg.me { text-align:right; }
-.bubble { display:inline-block; padding:6px 10px; background:#0ff6; border-radius:8px; }
-.system { text-align:center; opacity:.7; }
-.inputBox { display:flex; gap:5px; margin-top:5px; }
-#emojiBox { background:#0008; padding:6px; cursor:pointer; }
-</style>
 
 </body>
 </html>
+
