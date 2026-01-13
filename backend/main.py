@@ -43,24 +43,28 @@ class ConnectionManager:
         # отправляем историю
         for msg in load_messages():
             if isinstance(msg, dict):
-                await websocket.send_json({
-                    "type": "message",
-                    "nick": msg.get("nick", ""),
-                    "text": msg.get("text", "")
-                })
+                await websocket.send_text(
+                    json.dumps({
+                        "type": "message",
+                        "nick": msg.get("nick", ""),
+                        "text": msg.get("text", "")
+                    }, ensure_ascii=False)   # ✅ ВАЖНО
+                )
 
     def disconnect(self, websocket: WebSocket):
         self.active.pop(websocket, None)
 
     async def broadcast(self, message: dict):
         save_message(message)
+        payload = json.dumps({
+            "type": "message",
+            "nick": message["nick"],
+            "text": message["text"]
+        }, ensure_ascii=False)               # ✅ ВАЖНО
+
         for ws in list(self.active):
             try:
-                await ws.send_json({
-                    "type": "message",
-                    "nick": message["nick"],
-                    "text": message["text"]
-                })
+                await ws.send_text(payload)
             except:
                 self.disconnect(ws)
 
@@ -82,25 +86,31 @@ async def websocket_endpoint(websocket: WebSocket):
             if text.startswith("/nick "):
                 nick = text.replace("/nick ", "").strip()
                 if not nick:
-                    await websocket.send_json({
-                        "type": "system",
-                        "text": "❌ Ник не может быть пустым"
-                    })
+                    await websocket.send_text(
+                        json.dumps({
+                            "type": "system",
+                            "text": "❌ Ник не может быть пустым"
+                        }, ensure_ascii=False)
+                    )
                     continue
 
                 manager.active[websocket] = nick
-                await websocket.send_json({
-                    "type": "system",
-                    "text": f"✅ Ник установлен: {nick}"
-                })
+                await websocket.send_text(
+                    json.dumps({
+                        "type": "system",
+                        "text": f"✅ Ник установлен: {nick}"
+                    }, ensure_ascii=False)
+                )
                 continue
 
             nick = manager.active.get(websocket)
             if not nick:
-                await websocket.send_json({
-                    "type": "system",
-                    "text": "❌ Сначала укажи ник"
-                })
+                await websocket.send_text(
+                    json.dumps({
+                        "type": "system",
+                        "text": "❌ Сначала укажи ник"
+                    }, ensure_ascii=False)
+                )
                 continue
 
             await manager.broadcast({
