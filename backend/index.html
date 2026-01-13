@@ -27,7 +27,6 @@ body {
     padding: 14px;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 0 40px rgba(0,0,0,0.6);
 }
 
 #messages {
@@ -109,32 +108,19 @@ const ws = new WebSocket(`${protocol}://${location.host}/ws`);
 let myNick = "";
 
 ws.onmessage = (e) => {
-    let data;
-    try {
-        data = JSON.parse(e.data);
-    } catch {
-        return;
-    }
-
-    const messages = document.getElementById("messages");
+    const text = e.data;
     const msg = document.createElement("div");
+    msg.classList.add("msg");
 
-    if (data.type === "system") {
-        msg.className = "msg other";
-        msg.textContent = data.text;
+    if (myNick && text.startsWith(myNick + ":")) {
+        msg.classList.add("me");
+        msg.textContent = text.replace(myNick + ":", "").trim();
+    } else {
+        msg.classList.add("other");
+        msg.textContent = text;
     }
 
-    if (data.type === "message") {
-        if (data.nick === myNick) {
-            msg.className = "msg me";
-            msg.textContent = data.text;
-        } else {
-            msg.className = "msg other";
-            msg.textContent = data.nick + ": " + data.text;
-        }
-    }
-
-    messages.appendChild(msg);
+    document.getElementById("messages").appendChild(msg);
     msg.scrollIntoView({ behavior: "smooth" });
 };
 
