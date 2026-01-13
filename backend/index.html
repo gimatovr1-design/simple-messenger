@@ -20,6 +20,7 @@
     <div id="users">
         <b>Онлайн</b>
         <ul id="userList"></ul>
+        <button onclick="startVideo()" style="margin-top:6px;width:100%">📹 Видеозвонок</button>
     </div>
 
     <div class="chatBox">
@@ -33,6 +34,11 @@
             <input id="messageInput" placeholder="Сообщение">
             <button onclick="sendMessage()">Отправить</button>
         </div>
+
+        <div class="videoBox">
+            <video id="localVideo" autoplay muted playsinline></video>
+            <video id="remoteVideo" autoplay playsinline></video>
+        </div>
     </div>
 
 </div>
@@ -41,11 +47,16 @@
 let myNick = "";
 let users = new Set();
 
-const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤ 💔 💖 💕 💯 🔥 🎉".split(" ");
-
-let ws = new WebSocket(
+// ===== CHAT WS =====
+const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") +
     location.host + "/ws"
+);
+
+// ===== WEBRTC WS =====
+const rtcWs = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") +
+    location.host + "/webrtc"
 );
 
 ws.onmessage = (event) => {
@@ -65,6 +76,7 @@ ws.onmessage = (event) => {
     }
 };
 
+// ================== CHAT ==================
 function setNick() {
     const nick = nickInput.value.trim();
     if (!nick) return;
@@ -108,14 +120,10 @@ function addMessage(nick, text, side) {
     bubble.className = "bubble";
 
     if (text.startsWith("data:image")) {
-        bubble.innerHTML = `<b>${nick}</b><br>
-        <img src="${text}" style="max-width:240px;border-radius:8px">`;
-    }
-    else if (text.startsWith("data:video")) {
-        bubble.innerHTML = `<b>${nick}</b><br>
-        <video src="${text}" controls style="max-width:240px;border-radius:8px;background:#000"></video>`;
-    }
-    else {
+        bubble.innerHTML = `<b>${nick}</b><br><img src="${text}" style="max-width:240px;border-radius:8px">`;
+    } else if (text.startsWith("data:video")) {
+        bubble.innerHTML = `<b>${nick}</b><br><video src="${text}" controls style="max-width:240px;border-radius:8px;background:#000"></video>`;
+    } else {
         bubble.innerHTML = `<b>${nick}</b><br>${text}`;
     }
 
@@ -141,9 +149,11 @@ function renderUsers() {
     });
 }
 
+// ================== EMOJI ==================
+const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤ 💔 💖 💕 💯 🔥 🎉".split(" ");
+
 function toggleEmoji() {
-    emojiPanel.style.display =
-        emojiPanel.style.display === "block" ? "none" : "block";
+    emojiPanel.style.display = emojiPanel.style.display === "block" ? "none" : "block";
 }
 
 emojis.forEach(e => {
@@ -155,6 +165,60 @@ emojis.forEach(e => {
     };
     emojiPanel.appendChild(span);
 });
+
+// ================== VIDEO ==================
+let pc;
+let localStream;
+const room = "global-room";
+
+rtcWs.onmessage = async e => {
+    const data = JSON.parse(e.data);
+    if (!pc) createPC();
+
+    if (data.type === "video_offer") {
+        await pc.setRemoteDescription(data.offer);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        rtcWs.send(JSON.stringify({ type:"video_answer", room, answer }));
+    }
+
+    if (data.type === "video_answer") {
+        await pc.setRemoteDescription(data.answer);
+    }
+
+    if (data.type === "video_ice") {
+        await pc.addIceCandidate(data.candidate);
+    }
+};
+
+function createPC() {
+    pc = new RTCPeerConnection();
+    pc.ontrack = e => remoteVideo.srcObject = e.streams[0];
+    pc.onicecandidate = e => {
+        if (e.candidate) {
+            rtcWs.send(JSON.stringify({
+                type: "video_ice",
+                room,
+                candidate: e.candidate
+            }));
+        }
+    };
+}
+
+async function startVideo() {
+    localStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
+    localVideo.srcObject = localStream;
+
+    createPC();
+    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+    rtcWs.send(JSON.stringify({ type:"video_join", room }));
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    rtcWs.send(JSON.stringify({ type:"video_offer", room, offer }));
+}
 </script>
 
 <style>
@@ -179,11 +243,23 @@ body {
 .chatBox { flex: 1; }
 
 #chat {
-    height: 320px;
+    height: 280px;
     overflow-y: auto;
     background: rgba(0,0,0,.45);
     border-radius: 8px;
     padding: 10px;
+}
+
+.videoBox {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+video {
+    width: 50%;
+    border-radius: 8px;
+    background: #000;
 }
 
 .msg { display: flex; margin-bottom: 8px; }

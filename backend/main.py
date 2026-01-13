@@ -17,6 +17,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
+# ===================== CHAT STORAGE =====================
 def load_messages():
     if not os.path.exists(MESSAGES_FILE):
         return []
@@ -39,7 +40,7 @@ async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 
-# ===== ЗАГРУЗКА ФОТО И ВИДЕО =====
+# ===================== UPLOAD =====================
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
     ext = os.path.splitext(file.filename)[1]
@@ -52,6 +53,7 @@ async def upload(file: UploadFile = File(...)):
     return {"url": f"/uploads/{name}"}
 
 
+# ===================== CHAT =====================
 class ConnectionManager:
     def __init__(self):
         self.active: dict[WebSocket, str] = {}
@@ -62,12 +64,11 @@ class ConnectionManager:
 
         # отправляем историю
         for msg in load_messages():
-            if isinstance(msg, dict):
-                await websocket.send_json({
-                    "type": "message",   # ❗ ВАЖНО
-                    "nick": msg.get("nick", ""),
-                    "text": msg.get("text", "")
-                })
+            await websocket.send_json({
+                "type": "message",
+                "nick": msg.get("nick", ""),
+                "text": msg.get("text", "")
+            })
 
     def disconnect(self, websocket: WebSocket):
         self.active.pop(websocket, None)
@@ -76,11 +77,7 @@ class ConnectionManager:
         save_message(message)
         for ws in list(self.active):
             try:
-                await ws.send_json({
-                    "type": "message",   # ❗ ВАЖНО
-                    "nick": message["nick"],
-                    "text": message["text"]
-                })
+                await ws.send_json(message)
             except:
                 self.disconnect(ws)
 
@@ -98,7 +95,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if not text:
                 continue
 
-            # установка ника
+            # /nick
             if text.startswith("/nick "):
                 nick = text.replace("/nick ", "").strip()
                 if not nick:
@@ -124,7 +121,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 continue
 
             await manager.broadcast({
-                "type": "message",   # ❗ ВАЖНО
+                "type": "message",
                 "nick": nick,
                 "text": text
             })
@@ -133,21 +130,41 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# ===================== WEBRTC SIGNALING =====================
+video_rooms: dict[str, set[WebSocket]] = {}
 
-# ===== WEBRTC SIGNALING =====
 @app.websocket("/webrtc")
 async def webrtc_endpoint(websocket: WebSocket):
     await websocket.accept()
+
     try:
         while True:
-            data = await websocket.receive_text()
-            # просто пересылаем сигнал всем
-            for ws in manager.active:
-                try:
-                    await ws.send_text(data)
-                except:
-                    pass
+            data = json.loads(await websocket.receive_text())
+            msg_type = data.get("type")
+            room = data.get("room")
+
+            if not room:
+                continue
+
+            # join room
+            if msg_type == "video_join":
+                video_rooms.setdefault(room, set()).add(websocket)
+                continue
+
+            # relay signaling
+            if msg_type in ("video_offer", "video_answer", "video_ice"):
+                for ws in video_rooms.get(room, set()):
+                    if ws != websocket:
+                        try:
+                            await ws.send_text(json.dumps(data))
+                        except:
+                            pass
+
     except WebSocketDisconnect:
-        pass
+        # очистка
+        for room in video_rooms.values():
+            room.discard(websocket)
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
