@@ -10,27 +10,35 @@
 
 <h3>Добро пожаловать в чат 👋</h3>
 
+<!-- ===== ВВОД НИКА ===== -->
 <div id="nickBox">
-    <input id="nickInput" placeholder="Введите ник">
+    <input id="nickInput" placeholder="Введите ник" autocomplete="off">
     <button onclick="setNick()">OK</button>
 </div>
 
-<!-- ===== СПИСОК ОНЛАЙН ===== -->
-<div id="usersBox">
-    <strong>Онлайн:</strong>
-    <div id="users"></div>
-</div>
+<div class="layout">
 
-<div id="chat"></div>
+    <!-- ===== СПИСОК ОНЛАЙН ===== -->
+    <div id="users">
+        <b>Онлайн</b>
+        <ul id="userList"></ul>
+    </div>
 
-<div class="inputBox">
-    <input id="messageInput" placeholder="Сообщение">
-    <button onclick="sendMessage()">Отправить</button>
+    <!-- ===== ЧАТ ===== -->
+    <div class="chatBox">
+        <div id="chat"></div>
+
+        <div class="inputBox">
+            <input id="messageInput" placeholder="Сообщение">
+            <button onclick="sendMessage()">Отправить</button>
+        </div>
+    </div>
+
 </div>
 
 <script>
-let myNick = "";
-let onlineUsers = {};
+let myNick = "";                 // ❌ НЕ сохраняется
+let users = new Set();           // онлайн пользователи
 
 let ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") +
@@ -39,47 +47,59 @@ let ws = new WebSocket(
 
 ws.onmessage = (event) => {
     let data;
-    try {
-        data = JSON.parse(event.data);
-    } catch {
-        return;
-    }
+    try { data = JSON.parse(event.data); } catch { return; }
 
+    // системные сообщения
     if (data.type === "system") {
-        if (data.text.includes("подключ")) {
-            const nick = data.text.split(": ").pop();
-            onlineUsers[nick] = Date.now();
-            renderUsers();
-        }
-
-        if (data.text.includes("отключ")) {
-            const nick = data.text.split(": ").pop();
-            if (onlineUsers[nick]) {
-                onlineUsers[nick] = 0;
-                renderUsers();
-            }
-        }
+        handleSystem(data.text);
         return;
     }
 
+    // обычные сообщения
     if (data.type === "message") {
-        onlineUsers[data.nick] = Date.now();
+        users.add(data.nick);
         renderUsers();
-        addMessage(
-            data.nick,
-            data.text,
-            data.nick === myNick ? "me" : "other"
-        );
+
+        const side = data.nick === myNick ? "me" : "other";
+        addMessage(data.nick, data.text, side);
     }
 };
 
+function handleSystem(text) {
+    // ник установлен
+    if (text.includes("Ник установлен")) {
+        addSystem(text);
+        return;
+    }
+
+    // пользователь вошёл
+    if (text.includes("вошёл")) {
+        const nick = text.split(" ")[0];
+        users.add(nick);
+        renderUsers();
+        addSystem("🟢 " + text);
+        return;
+    }
+
+    // пользователь вышел
+    if (text.includes("вышел")) {
+        const nick = text.split(" ")[0];
+        users.delete(nick);
+        renderUsers();
+        addSystem("🔴 " + text);
+        return;
+    }
+
+    addSystem(text);
+}
+
 function setNick() {
     const nick = document.getElementById("nickInput").value.trim();
-    if (nick) {
-        myNick = nick;
-        ws.send("/nick " + nick);
-        document.getElementById("nickBox").style.display = "none";
-    }
+    if (!nick) return;
+
+    myNick = nick;
+    ws.send("/nick " + nick);
+    document.getElementById("nickBox").style.display = "none";
 }
 
 function sendMessage() {
@@ -90,170 +110,187 @@ function sendMessage() {
     }
 }
 
+// отправка по Enter
 document.getElementById("messageInput").addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
 });
 
-function renderUsers() {
-    const box = document.getElementById("users");
-    box.innerHTML = "";
-    Object.keys(onlineUsers).forEach(nick => {
-        const div = document.createElement("div");
-        div.className = "user";
-        div.innerHTML = `
-            <span class="dot ${onlineUsers[nick] ? 'on' : 'off'}"></span>
-            ${nick}
-        `;
-        box.appendChild(div);
-    });
-}
-
 function addMessage(nick, text, side) {
     const chat = document.getElementById("chat");
 
-    const row = document.createElement("div");
-    row.className = "row " + side + " appear";
+    const msg = document.createElement("div");
+    msg.className = "msg " + side;
 
     const avatar = document.createElement("div");
     avatar.className = "avatar";
     avatar.textContent = nick[0].toUpperCase();
 
-    const status = document.createElement("span");
-    status.className = "online";
-    if (!onlineUsers[nick]) status.classList.add("offline");
-    avatar.appendChild(status);
-
     const bubble = document.createElement("div");
     bubble.className = "bubble";
-    bubble.innerHTML = `<strong>${nick}</strong><br>${text}`;
+    bubble.innerHTML = `<b>${nick}</b><br>${text}`;
 
-    row.appendChild(avatar);
-    row.appendChild(bubble);
-    chat.appendChild(row);
+    msg.appendChild(avatar);
+    msg.appendChild(bubble);
 
+    chat.appendChild(msg);
     chat.scrollTop = chat.scrollHeight;
+}
+
+function addSystem(text) {
+    const div = document.createElement("div");
+    div.className = "system";
+    div.textContent = text;
+    chat.appendChild(div);
+}
+
+function renderUsers() {
+    const list = document.getElementById("userList");
+    list.innerHTML = "";
+    users.forEach(nick => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span class="dot"></span>${nick}`;
+        list.appendChild(li);
+    });
 }
 </script>
 
-</body>
-
 <style>
+/* ===== ОБЩЕЕ ===== */
 body {
     margin: 0;
-    min-height: 100vh;
     padding: 10px;
+    min-height: 100vh;
     font-family: system-ui, sans-serif;
     color: #fff;
+
     background:
         linear-gradient(120deg,
-            rgba(140,0,255,0.45),
-            rgba(0,180,255,0.45),
-            rgba(255,0,140,0.45)
+            rgba(140,0,255,.45),
+            rgba(0,180,255,.45),
+            rgba(255,0,140,.45)
         ),
         url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee");
+
     background-size: 300% 300%, cover;
-    animation: neon 20s infinite;
+    background-attachment: fixed;
+    animation: neonMove 20s ease infinite;
 }
 
-@keyframes neon {
+@keyframes neonMove {
     0% { background-position: 0% 50%, center; }
     50% { background-position: 100% 50%, center; }
     100% { background-position: 0% 50%, center; }
 }
 
-#usersBox {
-    background: rgba(0,0,0,0.4);
-    padding: 6px;
-    border-radius: 6px;
-    margin-bottom: 6px;
-    font-size: 14px;
+/* ===== LAYOUT ===== */
+.layout {
+    display: flex;
+    gap: 10px;
 }
 
-.user {
+#users {
+    width: 160px;
+    background: rgba(0,0,0,.45);
+    padding: 8px;
+    border-radius: 8px;
+}
+
+#userList {
+    list-style: none;
+    padding: 0;
+    margin: 6px 0 0;
+}
+
+#userList li {
     display: flex;
     align-items: center;
     gap: 6px;
+    margin-bottom: 4px;
 }
 
 .dot {
     width: 8px;
     height: 8px;
+    background: #00ff88;
     border-radius: 50%;
 }
-.dot.on { background: #00ff6a; box-shadow: 0 0 6px #00ff6a; }
-.dot.off { background: #ff3b3b; }
+
+/* ===== ЧАТ ===== */
+.chatBox {
+    flex: 1;
+}
 
 #chat {
-    height: 300px;
+    height: 320px;
     overflow-y: auto;
-    background: rgba(0,0,0,0.45);
-    padding: 10px;
+    background: rgba(0,0,0,.45);
     border-radius: 8px;
-    margin-bottom: 8px;
+    padding: 10px;
 }
 
-.row {
+.msg {
     display: flex;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    animation: fadeIn .3s ease;
 }
-.row.me { flex-direction: row-reverse; }
 
-.bubble {
-    max-width: 70%;
-    padding: 8px 12px;
-    border-radius: 12px;
-    background: rgba(0,255,255,0.35);
+.msg.me {
+    flex-direction: row-reverse;
 }
-.row.other .bubble {
-    background: rgba(255,0,255,0.35);
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
 }
 
 .avatar {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: rgba(255,255,255,0.25);
+    background: rgba(255,255,255,.2);
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 8px;
-    position: relative;
+    margin: 0 6px;
     font-weight: bold;
 }
 
-.online {
-    width: 8px;
-    height: 8px;
-    background: #00ff6a;
-    border-radius: 50%;
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-}
-.online.offline {
-    background: #ff3b3b;
+.bubble {
+    max-width: 65%;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(0,255,255,.35);
 }
 
-.appear {
-    animation: appear 0.35s ease;
-}
-@keyframes appear {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.msg.other .bubble {
+    background: rgba(255,0,255,.35);
 }
 
+.system {
+    text-align: center;
+    font-size: 13px;
+    opacity: .8;
+    margin: 6px 0;
+}
+
+/* ===== ВВОД ===== */
 .inputBox {
     display: flex;
     gap: 6px;
+    margin-top: 6px;
 }
-input { flex: 1; padding: 6px; }
-button { padding: 6px 12px; cursor: pointer; }
+
+input {
+    flex: 1;
+    padding: 6px;
+}
+
+button {
+    padding: 6px 12px;
+    cursor: pointer;
+}
 </style>
 
+</body>
 </html>
+
