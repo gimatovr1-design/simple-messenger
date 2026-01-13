@@ -25,19 +25,20 @@
     <div class="chatBox">
         <div id="chat"></div>
 
+        <!-- ✅ ДОБАВЛЕНО, НЕ ЛОМАЕТ -->
+        <div id="emojiPanel" class="emojiPanel"></div>
+
         <div class="inputBox">
             <button onclick="toggleEmoji()">😀</button>
 
             <label class="clip">
                 📎
-                <input type="file" id="fileInput" hidden>
+                <input type="file" id="fileInput" hidden accept="image/*">
             </label>
 
             <input id="messageInput" placeholder="Сообщение">
             <button onclick="sendMessage()">Отправить</button>
         </div>
-
-        <div id="emojiPanel" class="emojiPanel"></div>
     </div>
 
 </div>
@@ -69,49 +70,37 @@ ws.onmessage = (event) => {
 };
 
 function handleSystem(text) {
-    if (text.includes("Ник установлен")) {
-        addSystem(text);
-        return;
-    }
     if (text.includes("вошёл")) {
-        const nick = text.split(" ")[0];
-        users.add(nick);
+        users.add(text.split(" ")[0]);
         renderUsers();
-        addSystem("🟢 " + text);
-        return;
     }
     if (text.includes("вышел")) {
-        const nick = text.split(" ")[0];
-        users.delete(nick);
+        users.delete(text.split(" ")[0]);
         renderUsers();
-        addSystem("🔴 " + text);
-        return;
     }
     addSystem(text);
 }
 
 function setNick() {
-    const nick = document.getElementById("nickInput").value.trim();
+    const nick = nickInput.value.trim();
     if (!nick) return;
     myNick = nick;
     ws.send("/nick " + nick);
-    document.getElementById("nickBox").style.display = "none";
+    nickBox.style.display = "none";
 }
 
 function sendMessage() {
-    const input = document.getElementById("messageInput");
-    if (input.value.trim()) {
-        ws.send(input.value);
-        input.value = "";
+    if (messageInput.value.trim()) {
+        ws.send(messageInput.value);
+        messageInput.value = "";
     }
 }
 
-document.getElementById("messageInput").addEventListener("keydown", e => {
+messageInput.addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
 });
 
 function addMessage(nick, text, side) {
-    const chat = document.getElementById("chat");
     const msg = document.createElement("div");
     msg.className = "msg " + side;
 
@@ -123,53 +112,72 @@ function addMessage(nick, text, side) {
     bubble.className = "bubble";
     bubble.innerHTML = `<b>${nick}</b><br>${text}`;
 
-    msg.appendChild(avatar);
-    msg.appendChild(bubble);
+    msg.append(avatar, bubble);
+    chat.appendChild(msg);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function addImage(src) {
+    const msg = document.createElement("div");
+    msg.className = "msg me";
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = myNick[0].toUpperCase();
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = `<b>${myNick}</b><br>`;
+    
+    const img = document.createElement("img");
+    img.src = src;
+    img.style.maxWidth = "200px";
+    img.style.borderRadius = "6px";
+
+    bubble.appendChild(img);
+    msg.append(avatar, bubble);
     chat.appendChild(msg);
     chat.scrollTop = chat.scrollHeight;
 }
 
 function addSystem(text) {
-    const div = document.createElement("div");
-    div.className = "system";
-    div.textContent = text;
-    chat.appendChild(div);
+    const d = document.createElement("div");
+    d.className = "system";
+    d.textContent = text;
+    chat.appendChild(d);
 }
 
 function renderUsers() {
-    const list = document.getElementById("userList");
-    list.innerHTML = "";
-    users.forEach(nick => {
+    userList.innerHTML = "";
+    users.forEach(n => {
         const li = document.createElement("li");
-        li.innerHTML = `<span class="dot"></span>${nick}`;
-        list.appendChild(li);
+        li.innerHTML = `<span class="dot"></span>${n}`;
+        userList.appendChild(li);
     });
 }
 
-/* ===== ЭМОДЗИ ===== */
-const emojis = "😀😁😂🤣😃😄😅😉😊😍😘😜😎🤔😢😭😡👍👎🔥❤️💯🎉".split("");
-const panel = document.getElementById("emojiPanel");
-const input = document.getElementById("messageInput");
-
-emojis.forEach(e => {
+/* ===== ЭМОДЗИ (ЗАМЕНА НЕРАБОЧЕГО) ===== */
+const emojiList = "😀😁😂🤣😃😄😅😉😊😍😘😜😎🤔😢😭😡👍👎🔥❤️💯🎉".split("");
+emojiList.forEach(e => {
     const s = document.createElement("span");
     s.textContent = e;
-    s.onclick = () => {
-        input.value += e;
-        input.focus();
-    };
-    panel.appendChild(s);
+    s.onclick = () => messageInput.value += e;
+    emojiPanel.appendChild(s);
 });
 
 function toggleEmoji() {
-    panel.style.display = panel.style.display === "flex" ? "none" : "flex";
+    emojiPanel.style.display =
+        emojiPanel.style.display === "flex" ? "none" : "flex";
 }
 
-/* ===== ФАЙЛ ===== */
-document.getElementById("fileInput").addEventListener("change", e => {
+/* ===== ФОТО (ЗАМЕНА НЕРАБОЧЕГО) ===== */
+fileInput.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
-    ws.send("📎 Файл: " + file.name);
+
+    const reader = new FileReader();
+    reader.onload = () => addImage(reader.result);
+    reader.readAsDataURL(file);
     e.target.value = "";
 });
 </script>
@@ -189,7 +197,6 @@ body {
         ),
         url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee");
     background-size: 300% 300%, cover;
-    background-attachment: fixed;
     animation: neonMove 20s ease infinite;
 }
 
@@ -199,36 +206,13 @@ body {
     100% { background-position: 0% 50%, center; }
 }
 
-.layout {
-    display: flex;
-    gap: 10px;
-}
+.layout { display: flex; gap: 10px; }
 
 #users {
     width: 160px;
     background: rgba(0,0,0,.45);
     padding: 8px;
     border-radius: 8px;
-}
-
-#userList {
-    list-style: none;
-    padding: 0;
-    margin: 6px 0 0;
-}
-
-#userList li {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-}
-
-.dot {
-    width: 8px;
-    height: 8px;
-    background: #00ff88;
-    border-radius: 50%;
 }
 
 .chatBox { flex: 1; }
@@ -241,11 +225,7 @@ body {
     padding: 10px;
 }
 
-.msg {
-    display: flex;
-    margin-bottom: 8px;
-}
-
+.msg { display: flex; margin-bottom: 8px; }
 .msg.me { flex-direction: row-reverse; }
 
 .avatar {
@@ -284,15 +264,8 @@ body {
     margin-top: 6px;
 }
 
-input {
-    flex: 1;
-    padding: 6px;
-}
-
-button {
-    padding: 6px 12px;
-    cursor: pointer;
-}
+input { flex: 1; padding: 6px; }
+button { padding: 6px 12px; cursor: pointer; }
 
 .emojiPanel {
     display: none;
@@ -301,18 +274,15 @@ button {
     padding: 6px;
     background: rgba(0,0,0,.6);
     border-radius: 8px;
-    margin-top: 6px;
+    margin: 6px 0;
 }
 
 .emojiPanel span {
-    cursor: pointer;
     font-size: 20px;
+    cursor: pointer;
 }
 
-.clip {
-    cursor: pointer;
-    user-select: none;
-}
+.clip { cursor: pointer; }
 </style>
 
 </body>
