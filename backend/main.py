@@ -1,6 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
-import uvicorn
 import os
 
 app = FastAPI()
@@ -15,7 +14,7 @@ async def root():
 
 class ConnectionManager:
     def __init__(self):
-        self.active: dict[WebSocket, str] = {}
+        self.active = {}
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -50,7 +49,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if data.startswith("/nick "):
                 nick = data.replace("/nick ", "").strip()
                 if not nick:
-                    await websocket.send_text("❌ Ник не может быть пустым")
+                    await websocket.send_text("❌ Ник пустой")
                     continue
                 manager.active[websocket] = nick
                 await websocket.send_text(f"Ник установлен: {nick}")
@@ -66,6 +65,3 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
