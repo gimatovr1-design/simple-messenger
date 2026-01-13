@@ -15,6 +15,12 @@
     <button onclick="setNick()">OK</button>
 </div>
 
+<!-- ===== СПИСОК ОНЛАЙН ===== -->
+<div id="usersBox">
+    <strong>Онлайн:</strong>
+    <div id="users"></div>
+</div>
+
 <div id="chat"></div>
 
 <div class="inputBox">
@@ -24,7 +30,7 @@
 
 <script>
 let myNick = "";
-let onlineUsers = new Set();
+let onlineUsers = {};
 
 let ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") +
@@ -40,14 +46,30 @@ ws.onmessage = (event) => {
     }
 
     if (data.type === "system") {
-        addSystem(data.text);
+        if (data.text.includes("подключ")) {
+            const nick = data.text.split(": ").pop();
+            onlineUsers[nick] = Date.now();
+            renderUsers();
+        }
+
+        if (data.text.includes("отключ")) {
+            const nick = data.text.split(": ").pop();
+            if (onlineUsers[nick]) {
+                onlineUsers[nick] = 0;
+                renderUsers();
+            }
+        }
         return;
     }
 
     if (data.type === "message") {
-        onlineUsers.add(data.nick);
-        const side = data.nick === myNick ? "me" : "other";
-        addMessage(data.nick, data.text, side);
+        onlineUsers[data.nick] = Date.now();
+        renderUsers();
+        addMessage(
+            data.nick,
+            data.text,
+            data.nick === myNick ? "me" : "other"
+        );
     }
 };
 
@@ -72,26 +94,34 @@ document.getElementById("messageInput").addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
 });
 
-function addSystem(text) {
-    const div = document.createElement("div");
-    div.className = "system";
-    div.textContent = text;
-    chat.appendChild(div);
+function renderUsers() {
+    const box = document.getElementById("users");
+    box.innerHTML = "";
+    Object.keys(onlineUsers).forEach(nick => {
+        const div = document.createElement("div");
+        div.className = "user";
+        div.innerHTML = `
+            <span class="dot ${onlineUsers[nick] ? 'on' : 'off'}"></span>
+            ${nick}
+        `;
+        box.appendChild(div);
+    });
 }
 
 function addMessage(nick, text, side) {
     const chat = document.getElementById("chat");
 
     const row = document.createElement("div");
-    row.className = "row " + side;
+    row.className = "row " + side + " appear";
 
     const avatar = document.createElement("div");
     avatar.className = "avatar";
     avatar.textContent = nick[0].toUpperCase();
 
-    const online = document.createElement("span");
-    online.className = "online";
-    avatar.appendChild(online);
+    const status = document.createElement("span");
+    status.className = "online";
+    if (!onlineUsers[nick]) status.classList.add("offline");
+    avatar.appendChild(status);
 
     const bubble = document.createElement("div");
     bubble.className = "bubble";
@@ -99,8 +129,8 @@ function addMessage(nick, text, side) {
 
     row.appendChild(avatar);
     row.appendChild(bubble);
-
     chat.appendChild(row);
+
     chat.scrollTop = chat.scrollHeight;
 }
 </script>
@@ -114,7 +144,6 @@ body {
     padding: 10px;
     font-family: system-ui, sans-serif;
     color: #fff;
-
     background:
         linear-gradient(120deg,
             rgba(140,0,255,0.45),
@@ -122,7 +151,6 @@ body {
             rgba(255,0,140,0.45)
         ),
         url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee");
-
     background-size: 300% 300%, cover;
     animation: neon 20s infinite;
 }
@@ -133,8 +161,30 @@ body {
     100% { background-position: 0% 50%, center; }
 }
 
+#usersBox {
+    background: rgba(0,0,0,0.4);
+    padding: 6px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 14px;
+}
+
+.user {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+.dot.on { background: #00ff6a; box-shadow: 0 0 6px #00ff6a; }
+.dot.off { background: #ff3b3b; }
+
 #chat {
-    height: 320px;
+    height: 300px;
     overflow-y: auto;
     background: rgba(0,0,0,0.45);
     padding: 10px;
@@ -142,16 +192,11 @@ body {
     margin-bottom: 8px;
 }
 
-/* ===== сообщения ===== */
 .row {
     display: flex;
     margin-bottom: 10px;
-    align-items: flex-end;
 }
-
-.row.me {
-    flex-direction: row-reverse;
-}
+.row.me { flex-direction: row-reverse; }
 
 .bubble {
     max-width: 70%;
@@ -159,12 +204,10 @@ body {
     border-radius: 12px;
     background: rgba(0,255,255,0.35);
 }
-
 .row.other .bubble {
     background: rgba(255,0,255,0.35);
 }
 
-/* ===== аватар ===== */
 .avatar {
     width: 36px;
     height: 36px;
@@ -178,7 +221,6 @@ body {
     font-weight: bold;
 }
 
-/* онлайн индикатор */
 .online {
     width: 8px;
     height: 8px;
@@ -187,31 +229,31 @@ body {
     position: absolute;
     bottom: 2px;
     right: 2px;
-    box-shadow: 0 0 6px #00ff6a;
+}
+.online.offline {
+    background: #ff3b3b;
+}
+
+.appear {
+    animation: appear 0.35s ease;
+}
+@keyframes appear {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .inputBox {
     display: flex;
     gap: 6px;
 }
-
-input {
-    flex: 1;
-    padding: 6px;
-}
-
-button {
-    padding: 6px 12px;
-    cursor: pointer;
-}
-
-.system {
-    text-align: center;
-    font-size: 13px;
-    opacity: 0.7;
-    margin: 6px 0;
-}
+input { flex: 1; padding: 6px; }
+button { padding: 6px 12px; cursor: pointer; }
 </style>
 
 </html>
-
