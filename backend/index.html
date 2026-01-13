@@ -29,7 +29,7 @@
         <div id="chat"></div>
 
         <div class="inputBox">
-            <input id="messageInput" placeholder="Сообщение">
+            <input id="messageInput" placeholder="Сообщение" autocomplete="off">
             <button onclick="sendMessage()">Отправить</button>
         </div>
     </div>
@@ -37,10 +37,12 @@
 </div>
 
 <script>
-let myNick = "";                 // ❌ НЕ сохраняется
-let users = new Set();           // онлайн пользователи
+let myNick = "";          // ❌ НЕ сохраняем
+let users = new Set();
 
-let ws = new WebSocket(
+const chat = document.getElementById("chat");
+
+const ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") +
     location.host + "/ws"
 );
@@ -49,13 +51,11 @@ ws.onmessage = (event) => {
     let data;
     try { data = JSON.parse(event.data); } catch { return; }
 
-    // системные сообщения
     if (data.type === "system") {
         handleSystem(data.text);
         return;
     }
 
-    // обычные сообщения
     if (data.type === "message") {
         users.add(data.nick);
         renderUsers();
@@ -66,27 +66,22 @@ ws.onmessage = (event) => {
 };
 
 function handleSystem(text) {
-    // ник установлен
-    if (text.includes("Ник установлен")) {
-        addSystem(text);
-        return;
-    }
 
-    // пользователь вошёл
-    if (text.includes("вошёл")) {
-        const nick = text.split(" ")[0];
+    // 🟢 пользователь вошёл
+    if (text.endsWith("вошёл в чат")) {
+        const nick = text.replace(" вошёл в чат", "");
         users.add(nick);
         renderUsers();
-        addSystem("🟢 " + text);
+        addSystem("🟢 " + nick + " онлайн");
         return;
     }
 
-    // пользователь вышел
-    if (text.includes("вышел")) {
-        const nick = text.split(" ")[0];
+    // 🔴 пользователь вышел
+    if (text.endsWith("вышел из чата")) {
+        const nick = text.replace(" вышел из чата", "");
         users.delete(nick);
         renderUsers();
-        addSystem("🔴 " + text);
+        addSystem("🔴 " + nick + " офлайн");
         return;
     }
 
@@ -94,11 +89,14 @@ function handleSystem(text) {
 }
 
 function setNick() {
-    const nick = document.getElementById("nickInput").value.trim();
+    const input = document.getElementById("nickInput");
+    const nick = input.value.trim();
     if (!nick) return;
 
     myNick = nick;
     ws.send("/nick " + nick);
+
+    input.value = "";                 // ❌ визуально не сохраняем
     document.getElementById("nickBox").style.display = "none";
 }
 
@@ -110,14 +108,12 @@ function sendMessage() {
     }
 }
 
-// отправка по Enter
+// Enter = отправка
 document.getElementById("messageInput").addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
 });
 
 function addMessage(nick, text, side) {
-    const chat = document.getElementById("chat");
-
     const msg = document.createElement("div");
     msg.className = "msg " + side;
 
@@ -146,6 +142,7 @@ function addSystem(text) {
 function renderUsers() {
     const list = document.getElementById("userList");
     list.innerHTML = "";
+
     users.forEach(nick => {
         const li = document.createElement("li");
         li.innerHTML = `<span class="dot"></span>${nick}`;
@@ -155,7 +152,6 @@ function renderUsers() {
 </script>
 
 <style>
-/* ===== ОБЩЕЕ ===== */
 body {
     margin: 0;
     padding: 10px;
@@ -168,21 +164,17 @@ body {
             rgba(140,0,255,.45),
             rgba(0,180,255,.45),
             rgba(255,0,140,.45)
-        ),
-        url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee");
-
-    background-size: 300% 300%, cover;
-    background-attachment: fixed;
-    animation: neonMove 20s ease infinite;
+        );
+    background-size: 300% 300%;
+    animation: neonMove 18s ease infinite;
 }
 
 @keyframes neonMove {
-    0% { background-position: 0% 50%, center; }
-    50% { background-position: 100% 50%, center; }
-    100% { background-position: 0% 50%, center; }
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
 }
 
-/* ===== LAYOUT ===== */
 .layout {
     display: flex;
     gap: 10px;
@@ -215,10 +207,7 @@ body {
     border-radius: 50%;
 }
 
-/* ===== ЧАТ ===== */
-.chatBox {
-    flex: 1;
-}
+.chatBox { flex: 1; }
 
 #chat {
     height: 320px;
@@ -231,23 +220,21 @@ body {
 .msg {
     display: flex;
     margin-bottom: 8px;
-    animation: fadeIn .3s ease;
+    animation: fadeIn .25s ease;
 }
 
-.msg.me {
-    flex-direction: row-reverse;
-}
+.msg.me { flex-direction: row-reverse; }
 
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: none; }
+    to { opacity: 1; }
 }
 
 .avatar {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: rgba(255,255,255,.2);
+    background: rgba(255,255,255,.25);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -273,7 +260,6 @@ body {
     margin: 6px 0;
 }
 
-/* ===== ВВОД ===== */
 .inputBox {
     display: flex;
     gap: 6px;
@@ -293,4 +279,3 @@ button {
 
 </body>
 </html>
-
