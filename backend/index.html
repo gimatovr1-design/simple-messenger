@@ -96,7 +96,7 @@ messageInput.addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
 });
 
-/* 🔥 ГЛАВНОЕ ИСПРАВЛЕНИЕ ЗДЕСЬ */
+/* ✅ ИСПРАВЛЕНО ТОЛЬКО ЗДЕСЬ */
 function addMessage(nick, text, side) {
     const msg = document.createElement("div");
     msg.className = "msg " + side;
@@ -111,13 +111,18 @@ function addMessage(nick, text, side) {
     if (text.startsWith("data:image")) {
         bubble.innerHTML = `<b>${nick}</b><br>
             <img src="${text}" style="max-width:240px;border-radius:8px">`;
-    } 
+    }
     else if (text.startsWith("data:video")) {
         bubble.innerHTML = `<b>${nick}</b><br>
-            <video controls style="max-width:240px;border-radius:8px">
-                <source src="${text}">
+            <video
+                src="${text}"
+                controls
+                muted
+                playsinline
+                preload="metadata"
+                style="max-width:240px;border-radius:8px;background:#000">
             </video>`;
-    } 
+    }
     else {
         bubble.innerHTML = `<b>${nick}</b><br>${text}`;
     }
@@ -251,3 +256,4 @@ input, button {
 
 </body>
 </html>
+
