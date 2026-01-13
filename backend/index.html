@@ -10,7 +10,6 @@
 
 <h3>Добро пожаловать в чат 👋</h3>
 
-<!-- ===== ВВОД НИКА ===== -->
 <div id="nickBox">
     <input id="nickInput" placeholder="Введите ник" autocomplete="off">
     <button onclick="setNick()">OK</button>
@@ -18,13 +17,11 @@
 
 <div class="layout">
 
-    <!-- ===== СПИСОК ОНЛАЙН ===== -->
     <div id="users">
         <b>Онлайн</b>
         <ul id="userList"></ul>
     </div>
 
-    <!-- ===== ЧАТ ===== -->
     <div class="chatBox">
         <div id="chat"></div>
 
@@ -34,7 +31,6 @@
             <button onclick="sendMessage()">Отправить</button>
         </div>
 
-        <!-- ЭМОДЗИ -->
         <div style="margin-top:6px">
             <span onclick="addEmoji('😀')">😀</span>
             <span onclick="addEmoji('😂')">😂</span>
@@ -60,7 +56,7 @@ ws.onmessage = (event) => {
     try { data = JSON.parse(event.data); } catch { return; }
 
     if (data.type === "system") {
-        handleSystem(data.text);
+        addSystem(data.text);
         return;
     }
 
@@ -69,6 +65,11 @@ ws.onmessage = (event) => {
         renderUsers();
 
         const side = data.nick === myNick ? "me" : "other";
+
+        if (typeof data.text === "string") {
+            addMessage(data.nick, data.text, side);
+            return;
+        }
 
         if (data.text.type === "text") {
             addMessage(data.nick, data.text.data, side);
@@ -92,28 +93,18 @@ ws.onmessage = (event) => {
     }
 };
 
-function handleSystem(text) {
-    addSystem(text);
-}
-
 function setNick() {
     const nick = nickInput.value.trim();
     if (!nick) return;
-
     myNick = nick;
     ws.send("/nick " + nick);
     nickBox.style.display = "none";
 }
 
 function sendMessage() {
-    const input = messageInput;
-
-    if (input.value.trim()) {
-        ws.send(JSON.stringify({
-            type: "text",
-            data: input.value
-        }));
-        input.value = "";
+    if (messageInput.value.trim()) {
+        ws.send(messageInput.value);
+        messageInput.value = "";
     }
 
     const file = fileInput.files[0];
@@ -163,6 +154,7 @@ function addMessage(nick, text, side) {
 }
 
 function addSystem(text) {
+    const chat = document.getElementById("chat"); // ✅ ВОТ ЭТА СТРОКА — КЛЮЧ
     const div = document.createElement("div");
     div.className = "system";
     div.textContent = text;
