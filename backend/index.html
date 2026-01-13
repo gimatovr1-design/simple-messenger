@@ -10,15 +10,6 @@
 
 <h3>Добро пожаловать в чат 👋</h3>
 
-<!-- ===== ВИДЕОСВЯЗЬ ===== -->
-<div style="margin-bottom:10px;">
-    <button onclick="startCall()">🎥 Начать видеосвязь</button>
-    <button onclick="leaveCall()">❌ Выйти</button>
-</div>
-
-<div id="videos" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
-
-<!-- ===== ВВОД НИКА ===== -->
 <div id="nickBox">
     <input id="nickInput" placeholder="Введите ник" autocomplete="off">
     <button onclick="setNick()">OK</button>
@@ -34,59 +25,80 @@
     <div class="chatBox">
         <div id="chat"></div>
 
+        <div id="emojiPanel"></div>
+
         <div class="inputBox">
+            <button onclick="toggleEmoji()">😀</button>
+            <input type="file" id="fileInput" accept="image/*,video/*">
             <input id="messageInput" placeholder="Сообщение">
             <button onclick="sendMessage()">Отправить</button>
+
+            <!-- 🔽 ДОБАВЛЕНО: кнопки видеосвязи -->
+            <button onclick="startCall()">📹</button>
+            <button onclick="endCall()">❌</button>
         </div>
     </div>
 
 </div>
 
+<!-- 🔽 ДОБАВЛЕНО: видео элементы -->
+<video id="localVideo" autoplay muted playsinline
+style="width:120px;border-radius:8px;margin-top:8px"></video>
+
+<video id="remoteVideo" autoplay playsinline
+style="width:220px;border-radius:8px;margin-top:8px"></video>
+
 <script>
 let myNick = "";
 let users = new Set();
-let ws;
-let localStream;
-let peers = {};
 
-function connectWS() {
-    ws = new WebSocket(
-        (location.protocol === "https:" ? "wss://" : "ws://") +
-        location.host + "/ws"
-    );
+const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤ 💔 💖 💕 💯 🔥 🎉".split(" ");
 
-    ws.onmessage = async (event) => {
-        let data;
-        try { data = JSON.parse(event.data); } catch { return; }
+let ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") +
+    location.host + "/ws"
+);
 
-        if (data.type === "message") {
-            users.add(data.nick);
-            renderUsers();
-            addMessage(data.nick, data.text, data.nick === myNick ? "me" : "other");
-        }
+ws.onmessage = (event) => {
+    let data;
+    try { data = JSON.parse(event.data); } catch { return; }
 
-        if (data.type === "system") {
-            addSystem(data.text);
-        }
+    if (data.type === "system") {
+        handleSystem(data.text);
+        return;
+    }
 
-        if (data.type === "offer") await handleOffer(data);
-        if (data.type === "answer") await peers[data.from].setRemoteDescription(data.answer);
-        if (data.type === "candidate") await peers[data.from].addIceCandidate(data.candidate);
-    };
-}
-
-connectWS();
+    if (data.type === "message") {
+        users.add(data.nick);
+        renderUsers();
+        const side = data.nick === myNick ? "me" : "other";
+        addMessage(data.nick, data.text, side);
+    }
+};
 
 function setNick() {
-    myNick = nickInput.value.trim();
-    if (!myNick) return;
-    ws.send("/nick " + myNick);
+    const nick = nickInput.value.trim();
+    if (!nick) return;
+    myNick = nick;
+    ws.send("/nick " + nick);
     nickBox.style.display = "none";
 }
 
 function sendMessage() {
-    if (messageInput.value.trim()) {
-        ws.send(messageInput.value);
+    const text = messageInput.value.trim();
+    const file = fileInput.files[0];
+
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = () => ws.send(reader.result);
+        reader.readAsDataURL(file);
+        fileInput.value = "";
+        messageInput.value = "";
+        return;
+    }
+
+    if (text) {
+        ws.send(text);
         messageInput.value = "";
     }
 }
@@ -95,81 +107,127 @@ messageInput.addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
 });
 
-async function startCall() {
-    localStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
-    addVideo(myNick, localStream);
+function addMessage(nick, text, side) {
+    const msg = document.createElement("div");
+    msg.className = "msg " + side;
 
-    ws.send(JSON.stringify({ type:"join_call" }));
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = nick[0].toUpperCase();
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+
+    if (text.startsWith("data:image")) {
+        bubble.innerHTML = `<b>${nick}</b><br>
+            <img src="${text}" style="max-width:240px;border-radius:8px">`;
+    }
+    else if (text.startsWith("data:video")) {
+        bubble.innerHTML = `<b>${nick}</b><br>
+            <video src="${text}" controls playsinline
+            style="max-width:240px;border-radius:8px;background:#000"></video>`;
+    }
+    else {
+        bubble.innerHTML = `<b>${nick}</b><br>${text}`;
+    }
+
+    msg.appendChild(avatar);
+    msg.appendChild(bubble);
+    chat.appendChild(msg);
+    chat.scrollTop = chat.scrollHeight;
 }
 
-function leaveCall() {
-    for (let id in peers) peers[id].close();
-    peers = {};
-    videos.innerHTML = "";
+function handleSystem(text) {
+    const div = document.createElement("div");
+    div.className = "system";
+    div.textContent = text;
+    chat.appendChild(div);
 }
 
-async function handleOffer(data) {
-    const pc = createPeer(data.from);
-    await pc.setRemoteDescription(data.offer);
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    ws.send(JSON.stringify({ type:"answer", to:data.from, answer }));
-}
-
-function createPeer(id) {
-    const pc = new RTCPeerConnection();
-    peers[id] = pc;
-
-    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-
-    pc.ontrack = e => addVideo(id, e.streams[0]);
-
-    pc.onicecandidate = e => {
-        if (e.candidate) {
-            ws.send(JSON.stringify({
-                type:"candidate",
-                to:id,
-                candidate:e.candidate
-            }));
-        }
-    };
-
-    return pc;
-}
-
-function addVideo(id, stream) {
-    if (document.getElementById("v_"+id)) return;
-    const v = document.createElement("video");
-    v.id = "v_"+id;
-    v.srcObject = stream;
-    v.autoplay = true;
-    v.playsInline = true;
-    v.muted = id === myNick;
-    v.style.width = "200px";
-    videos.appendChild(v);
-}
-
-/* ==== чат функции (без изменений) ==== */
-function addMessage(nick,text,side){
-    const d=document.createElement("div");
-    d.textContent=`${nick}: ${text}`;
-    chat.appendChild(d);
-}
-function addSystem(t){
-    const d=document.createElement("div");
-    d.textContent=t;
-    chat.appendChild(d);
-}
-function renderUsers(){
-    userList.innerHTML="";
-    users.forEach(u=>{
-        const li=document.createElement("li");
-        li.textContent=u;
+function renderUsers() {
+    userList.innerHTML = "";
+    users.forEach(u => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span class="dot"></span>${u}`;
         userList.appendChild(li);
     });
 }
+
+function toggleEmoji() {
+    emojiPanel.style.display =
+        emojiPanel.style.display === "block" ? "none" : "block";
+}
+
+emojis.forEach(e => {
+    const span = document.createElement("span");
+    span.textContent = e;
+    span.onclick = () => {
+        messageInput.value += e;
+        messageInput.focus();
+    };
+    emojiPanel.appendChild(span);
+});
+
+/* 🔽 ДОБАВЛЕНО: WebRTC видеосвязь */
+let pc;
+let localStream;
+
+const rtcWs = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") +
+    location.host + "/webrtc"
+);
+
+rtcWs.onmessage = async e => {
+    const data = JSON.parse(e.data);
+
+    if (data.offer) {
+        await pc.setRemoteDescription(data.offer);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        rtcWs.send(JSON.stringify({ answer }));
+    }
+
+    if (data.answer) {
+        await pc.setRemoteDescription(data.answer);
+    }
+
+    if (data.candidate) {
+        await pc.addIceCandidate(data.candidate);
+    }
+};
+
+async function startCall() {
+    pc = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+    });
+
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    localVideo.srcObject = localStream;
+
+    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+    pc.ontrack = e => remoteVideo.srcObject = e.streams[0];
+
+    pc.onicecandidate = e => {
+        if (e.candidate) {
+            rtcWs.send(JSON.stringify({ candidate: e.candidate }));
+        }
+    };
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    rtcWs.send(JSON.stringify({ offer }));
+}
+
+function endCall() {
+    pc?.close();
+    localStream?.getTracks().forEach(t => t.stop());
+}
 </script>
+
+<style>
+/* ⬇️ ТВОИ СТИЛИ — НЕ ТРОГАЛ */
+</style>
 
 </body>
 </html>
-
