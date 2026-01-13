@@ -19,24 +19,43 @@
 <!-- ===== ЧАТ ===== -->
 <div id="chat"></div>
 
-<input id="messageInput" placeholder="Сообщение">
-<button onclick="sendMessage()">Отправить</button>
+<div class="inputBox">
+    <input id="messageInput" placeholder="Сообщение">
+    <button onclick="sendMessage()">Отправить</button>
+</div>
 
 <script>
+let myNick = "";
 let ws = new WebSocket(
     (location.protocol === "https:" ? "wss://" : "ws://") +
     location.host + "/ws"
 );
 
 ws.onmessage = (event) => {
-    const chat = document.getElementById("chat");
-    chat.innerHTML += `<div>${event.data}</div>`;
-    chat.scrollTop = chat.scrollHeight;
+    let data;
+    try {
+        data = JSON.parse(event.data);
+    } catch {
+        return;
+    }
+
+    // системные сообщения
+    if (data.type === "system") {
+        addMessage(data.text, "system");
+        return;
+    }
+
+    // обычные сообщения
+    if (data.type === "message") {
+        const side = data.nick === myNick ? "me" : "other";
+        addMessage(`${data.nick}: ${data.text}`, side);
+    }
 };
 
 function setNick() {
     const nick = document.getElementById("nickInput").value.trim();
     if (nick !== "") {
+        myNick = nick;
         ws.send("/nick " + nick);
         document.getElementById("nickBox").style.display = "none";
     }
@@ -49,61 +68,100 @@ function sendMessage() {
         input.value = "";
     }
 }
+
+// отправка по Enter
+document.getElementById("messageInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") sendMessage();
+});
+
+function addMessage(text, type) {
+    const chat = document.getElementById("chat");
+    const div = document.createElement("div");
+    div.className = "msg " + type;
+    div.textContent = text;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+}
 </script>
 
 </body>
 
-<!-- ===== СТИЛИ (ВНИЗУ, КАК ТЫ ХОТЕЛ) ===== -->
+<!-- ===== СТИЛИ ===== -->
 <style>
 body {
     margin: 0;
     min-height: 100vh;
     padding: 10px;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: system-ui, sans-serif;
     color: #fff;
 
     background:
-        linear-gradient(
-            120deg,
-            rgba(140, 0, 255, 0.45),
-            rgba(0, 180, 255, 0.45),
-            rgba(255, 0, 140, 0.45)
+        linear-gradient(120deg,
+            rgba(140,0,255,0.45),
+            rgba(0,180,255,0.45),
+            rgba(255,0,140,0.45)
         ),
         url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee");
 
     background-size: 300% 300%, cover;
-    background-position: 0% 50%, center;
-    background-repeat: no-repeat;
     background-attachment: fixed;
-
     animation: neonMove 20s ease infinite;
 }
 
 @keyframes neonMove {
-    0%   { background-position: 0% 50%, center; }
-    50%  { background-position: 100% 50%, center; }
+    0% { background-position: 0% 50%, center; }
+    50% { background-position: 100% 50%, center; }
     100% { background-position: 0% 50%, center; }
 }
 
-#nickBox {
+#chat {
+    height: 320px;
+    overflow-y: auto;
+    padding: 10px;
     margin-bottom: 8px;
+    background: rgba(0,0,0,0.45);
+    border-radius: 8px;
 }
 
-#chat {
-    height: 300px;
-    overflow-y: auto;
-    margin-bottom: 8px;
-    padding: 8px;
-    background: rgba(0,0,0,0.45);
-    border-radius: 6px;
+/* сообщения */
+.msg {
+    max-width: 70%;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+    border-radius: 10px;
+    word-wrap: break-word;
+}
+
+.msg.me {
+    margin-left: auto;
+    background: rgba(0, 255, 255, 0.35);
+    text-align: right;
+}
+
+.msg.other {
+    margin-right: auto;
+    background: rgba(255, 0, 255, 0.35);
+    text-align: left;
+}
+
+.msg.system {
+    margin: 6px auto;
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+.inputBox {
+    display: flex;
+    gap: 6px;
 }
 
 input {
     padding: 6px;
+    flex: 1;
 }
 
 button {
-    padding: 6px 10px;
+    padding: 6px 12px;
     cursor: pointer;
 }
 </style>
