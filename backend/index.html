@@ -5,70 +5,153 @@
 <title>Simple Messenger</title>
 
 <style>
+* { box-sizing: border-box; }
+
 body {
     margin: 0;
     height: 100vh;
-    background: #0f172a;
+    background: radial-gradient(circle at top, #1b1f3b, #0b0d1a);
+    font-family: 'Segoe UI', sans-serif;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-family: Arial;
+    color: white;
 }
 
 #chat {
-    width: 320px;
-    background: #020617;
-    border-radius: 10px;
-    padding: 10px;
+    width: 380px;
+    height: 560px;
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(14px);
+    border-radius: 18px;
+    padding: 14px;
     display: flex;
     flex-direction: column;
+    box-shadow: 0 0 40px rgba(0,0,0,0.6);
 }
 
 #messages {
     flex: 1;
     overflow-y: auto;
-    color: #e5e7eb;
-    font-size: 14px;
-    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.msg {
+    max-width: 75%;
+    padding: 8px 12px;
+    border-radius: 12px;
+    word-wrap: break-word;
+}
+
+.msg.me {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #4a6cff, #6c8bff);
+    text-align: right;
+}
+
+.msg.other {
+    align-self: flex-start;
+    background: rgba(255,255,255,0.15);
+}
+
+.row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
 }
 
 input {
-    padding: 8px;
+    flex: 1;
+    background: rgba(0,0,0,0.35);
     border: none;
-    border-radius: 6px;
+    border-radius: 10px;
+    padding: 10px;
+    color: white;
     outline: none;
+}
+
+button {
+    background: linear-gradient(135deg, #4a6cff, #6c8bff);
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: white;
+    cursor: pointer;
 }
 </style>
 </head>
+
 <body>
 
 <div id="chat">
+
+    <div class="row">
+        <input id="nick" placeholder="Введите ник">
+        <button onclick="setNick()">OK</button>
+    </div>
+
     <div id="messages"></div>
-    <input id="input" placeholder="Сообщение или /nick имя" autocomplete="off">
+
+    <div class="row">
+        <input id="text" placeholder="Сообщение"
+               onkeydown="if(event.key==='Enter') sendMessage()">
+        <button onclick="sendMessage()">➤</button>
+    </div>
+
 </div>
 
 <script>
-const ws = new WebSocket(
-    (location.protocol === "https:" ? "wss://" : "ws://") +
-    location.host + "/ws"
-);
+const protocol = location.protocol === "https:" ? "wss" : "ws";
+const ws = new WebSocket(`${protocol}://${location.host}/ws`);
 
-const messages = document.getElementById("messages");
-const input = document.getElementById("input");
+let myNick = "";
 
 ws.onmessage = (e) => {
-    const div = document.createElement("div");
-    div.textContent = e.data;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+    let data;
+    try {
+        data = JSON.parse(e.data);
+    } catch {
+        return;
+    }
+
+    const messages = document.getElementById("messages");
+    const msg = document.createElement("div");
+
+    if (data.type === "system") {
+        msg.className = "msg other";
+        msg.textContent = data.text;
+    }
+
+    if (data.type === "message") {
+        if (data.nick === myNick) {
+            msg.className = "msg me";
+            msg.textContent = data.text;
+        } else {
+            msg.className = "msg other";
+            msg.textContent = data.nick + ": " + data.text;
+        }
+    }
+
+    messages.appendChild(msg);
+    msg.scrollIntoView({ behavior: "smooth" });
 };
 
-input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && input.value.trim()) {
-        ws.send(input.value);
-        input.value = "";
-    }
-});
+function setNick() {
+    const nick = document.getElementById("nick").value.trim();
+    if (!nick) return;
+    myNick = nick;
+    ws.send("/nick " + nick);
+}
+
+function sendMessage() {
+    const input = document.getElementById("text");
+    const text = input.value.trim();
+    if (!text) return;
+    ws.send(text);
+    input.value = "";
+}
 </script>
 
 </body>
