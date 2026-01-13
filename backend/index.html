@@ -3,233 +3,238 @@
 <head>
 <meta charset="UTF-8">
 <title>Simple Messenger</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: linear-gradient(120deg,#0f2027,#203a43,#2c5364);
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.chat-wrapper {
+    width: 900px;
+    height: 550px;
+    display: flex;
+    background: rgba(0,0,0,0.55);
+    border-radius: 12px;
+    overflow: hidden;
+    color: white;
+}
+
+/* ===== ONLINE ===== */
+.online {
+    width: 200px;
+    background: rgba(0,0,0,0.4);
+    padding: 10px;
+}
+
+.online h3 {
+    margin: 5px 0 10px;
+}
+
+.user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #00ff6a;
+}
+
+/* ===== CHAT ===== */
+.chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.messages {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.msg {
+    max-width: 60%;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    animation: fade .2s;
+}
+
+.me {
+    background: #7b2cff;
+    margin-left: auto;
+}
+
+.other {
+    background: #444;
+    margin-right: auto;
+}
+
+.msg img, .msg video {
+    max-width: 100%;
+    border-radius: 8px;
+    margin-top: 5px;
+}
+
+/* ===== INPUT ===== */
+.input-area {
+    display: flex;
+    padding: 10px;
+    gap: 5px;
+}
+
+.input-area input[type=text] {
+    flex: 1;
+    padding: 8px;
+    border-radius: 6px;
+    border: none;
+}
+
+button {
+    border: none;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* ===== EMOJI ===== */
+.emoji-panel {
+    position: absolute;
+    bottom: 70px;
+    background: #222;
+    padding: 10px;
+    border-radius: 8px;
+    display: none;
+    max-width: 300px;
+}
+
+.emoji-panel span {
+    cursor: pointer;
+    font-size: 22px;
+    margin: 4px;
+}
+
+@keyframes fade {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; }
+}
+</style>
 </head>
 
 <body>
 
-<h3>Добро пожаловать в чат 👋</h3>
-
-<div id="nickBox">
-    <input id="nickInput" placeholder="Введите ник" autocomplete="off">
-    <button onclick="setNick()">OK</button>
-</div>
-
-<div class="layout">
-
-    <div id="users">
-        <b>Онлайн</b>
-        <ul id="userList"></ul>
+<div class="chat-wrapper">
+    <div class="online">
+        <h3>Онлайн</h3>
+        <div id="users"></div>
     </div>
 
-    <div class="chatBox">
-        <div id="chat"></div>
+    <div class="chat">
+        <div class="messages" id="messages"></div>
 
-        <div class="inputBox">
-            <input id="messageInput" placeholder="Сообщение" autocomplete="off">
-            <button onclick="sendMessage()">Отправить</button>
+        <div class="input-area">
+            <button onclick="toggleEmoji()">😀</button>
+            <input type="file" id="file" hidden>
+            <button onclick="document.getElementById('file').click()">📎</button>
+            <input id="text" type="text" placeholder="Сообщение">
+            <button onclick="sendText()">Отправить</button>
         </div>
     </div>
+</div>
 
+<div class="emoji-panel" id="emoji">
+😀 😁 😂 🤣 😍 😎 🤖 👻 🎉 🔥 💜 💙 💚 ❤️ 👍 👎 🙏 💀  
 </div>
 
 <script>
-let myNick = "";
-let users = new Set();
+const ws = new WebSocket(`ws://${location.host}/ws`);
+let myNick = null;
 
-const chat = document.getElementById("chat");
+ws.onmessage = e => {
+    const data = JSON.parse(e.data);
 
-const ws = new WebSocket(
-    (location.protocol === "https:" ? "wss://" : "ws://") +
-    location.host + "/ws"
-);
-
-ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-
-    if (data.type === "online") {
-        users.add(data.nick);
-        renderUsers();
-        system(`${data.nick} 🟢 онлайн`);
-        return;
-    }
-
-    if (data.type === "offline") {
-        users.delete(data.nick);
-        renderUsers();
-        system(`${data.nick} 🔴 офлайн`);
-        return;
+    if (data.type === "users") {
+        users.innerHTML = "";
+        data.users.forEach(u => {
+            users.innerHTML += `<div class="user"><div class="dot"></div>${u}</div>`;
+        });
     }
 
     if (data.type === "message") {
-        const side = data.nick === myNick ? "me" : "other";
-        addMessage(data.nick, data.text, side);
+        addMessage(data.nick, data);
     }
 };
 
-function setNick() {
-    const input = document.getElementById("nickInput");
-    const nick = input.value.trim();
-    if (!nick) return;
+function addMessage(nick, data) {
+    const div = document.createElement("div");
+    div.className = "msg " + (nick === myNick ? "me" : "other");
 
-    myNick = nick;
-    ws.send("/nick " + nick);
-
-    input.value = "";
-    document.getElementById("nickBox").style.display = "none";
-}
-
-function sendMessage() {
-    const input = document.getElementById("messageInput");
-    if (input.value.trim()) {
-        ws.send(input.value);
-        input.value = "";
+    if (data.file) {
+        if (data.file_type.startsWith("image")) {
+            div.innerHTML = `<b>${nick}</b><br><img src="${data.file}">`;
+        } else if (data.file_type.startsWith("video")) {
+            div.innerHTML = `<b>${nick}</b><br><video controls src="${data.file}"></video>`;
+        } else {
+            div.innerHTML = `<b>${nick}</b><br><a href="${data.file}" download>📁 Файл</a>`;
+        }
+    } else {
+        div.innerHTML = `<b>${nick}</b><br>${data.text}`;
     }
+
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
 }
 
-document.getElementById("messageInput").addEventListener("keydown", e => {
-    if (e.key === "Enter") sendMessage();
+function sendText() {
+    if (!text.value.trim()) return;
+    ws.send(JSON.stringify({ text: text.value }));
+    text.value = "";
+}
+
+file.onchange = () => {
+    const f = file.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+        ws.send(JSON.stringify({
+            file: reader.result,
+            file_type: f.type
+        }));
+    };
+    reader.readAsDataURL(f);
+    file.value = "";
+};
+
+text.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendText();
+    }
 });
 
-function addMessage(nick, text, side) {
-    const msg = document.createElement("div");
-    msg.className = "msg " + side;
-
-    const avatar = document.createElement("div");
-    avatar.className = "avatar";
-    avatar.textContent = nick[0].toUpperCase();
-
-    const bubble = document.createElement("div");
-    bubble.className = "bubble";
-    bubble.innerHTML = `<b>${nick}</b><br>${text}`;
-
-    msg.appendChild(avatar);
-    msg.appendChild(bubble);
-
-    chat.appendChild(msg);
-    chat.scrollTop = chat.scrollHeight;
+function toggleEmoji() {
+    emoji.style.display = emoji.style.display === "block" ? "none" : "block";
 }
 
-function system(text) {
-    const div = document.createElement("div");
-    div.className = "system";
-    div.textContent = text;
-    chat.appendChild(div);
-}
-
-function renderUsers() {
-    const list = document.getElementById("userList");
-    list.innerHTML = "";
-
-    users.forEach(nick => {
-        const li = document.createElement("li");
-        li.innerHTML = `<span class="dot"></span>${nick}`;
-        list.appendChild(li);
-    });
-}
+emoji.onclick = e => {
+    if (e.target.tagName === "SPAN" || e.target.nodeType === 3) {
+        text.value += e.target.textContent;
+    }
+};
 </script>
-
-<style>
-body {
-    margin: 0;
-    padding: 10px;
-    min-height: 100vh;
-    font-family: system-ui, sans-serif;
-    color: #fff;
-    background: linear-gradient(120deg,#5f2cff,#00c3ff,#ff2c9c);
-    background-size: 300% 300%;
-    animation: bg 18s ease infinite;
-}
-
-@keyframes bg {
-    0%{background-position:0% 50%}
-    50%{background-position:100% 50%}
-    100%{background-position:0% 50%}
-}
-
-.layout { display:flex; gap:10px; }
-
-#users {
-    width:160px;
-    background:rgba(0,0,0,.4);
-    padding:8px;
-    border-radius:8px;
-}
-
-#userList {
-    list-style:none;
-    padding:0;
-}
-
-#userList li {
-    display:flex;
-    gap:6px;
-    align-items:center;
-    margin-bottom:4px;
-}
-
-.dot {
-    width:8px;
-    height:8px;
-    border-radius:50%;
-    background:#00ff88;
-}
-
-.chatBox { flex:1; }
-
-#chat {
-    height:320px;
-    overflow-y:auto;
-    background:rgba(0,0,0,.4);
-    border-radius:8px;
-    padding:10px;
-}
-
-.msg {
-    display:flex;
-    margin-bottom:8px;
-}
-
-.msg.me { flex-direction:row-reverse; }
-
-.avatar {
-    width:36px;
-    height:36px;
-    border-radius:50%;
-    background:rgba(255,255,255,.3);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    margin:0 6px;
-}
-
-.bubble {
-    max-width:65%;
-    padding:6px 10px;
-    border-radius:10px;
-    background:rgba(0,255,255,.35);
-}
-
-.msg.other .bubble {
-    background:rgba(255,0,255,.35);
-}
-
-.system {
-    text-align:center;
-    opacity:.7;
-    font-size:13px;
-    margin:6px 0;
-}
-
-.inputBox {
-    display:flex;
-    gap:6px;
-    margin-top:6px;
-}
-
-input { flex:1; padding:6px; }
-button { padding:6px 12px; cursor:pointer; }
-</style>
 
 </body>
 </html>
+
