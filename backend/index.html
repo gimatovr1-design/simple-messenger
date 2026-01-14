@@ -153,7 +153,7 @@ input, button {
 </div>
 
 <script>
-/* === DOM (ОБЯЗАТЕЛЬНО) === */
+/* === DOM === */
 const authTitle = document.getElementById("authTitle");
 const phoneInput = document.getElementById("phoneInput");
 const passwordInput = document.getElementById("passwordInput");
@@ -240,16 +240,25 @@ function setNick(){
 
 function handleWS(e){
     const d = JSON.parse(e.data);
+
     if(d.type === "message"){
         addMessage(d.nick, d.text, d.nick === myNick ? "me" : "other");
+    }
+
+    if(d.type === "status"){
+        addSystem(
+            d.online
+            ? `🟢 ${d.nick} вошёл`
+            : `🔴 ${d.nick} вышел`
+        );
     }
 }
 
 function sendMessage(){
-    if(messageInput.value.trim()){
-        ws.send(messageInput.value);
-        messageInput.value = "";
-    }
+    const text = messageInput.value.trim();
+    if(!text) return;
+    ws.send(text);
+    messageInput.value = "";
 }
 
 messageInput.onkeydown = e => e.key === "Enter" && sendMessage();
@@ -262,6 +271,14 @@ function addMessage(nick, text, side){
         <div class="bubble"><b>${nick}</b><br>${text}</div>
     `;
     chat.appendChild(m);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function addSystem(text){
+    const d = document.createElement("div");
+    d.className = "system";
+    d.textContent = text;
+    chat.appendChild(d);
     chat.scrollTop = chat.scrollHeight;
 }
 
