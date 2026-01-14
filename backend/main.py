@@ -1,35 +1,29 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response, Request
-from fastapi.responses import FileResponse, RedirectResponse
-import uvicorn, os, json, uuid, hashlib
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response
+from fastapi.responses import FileResponse
+import uvicorn
+import os
+import json
+import uuid
+import hashlib
 
 app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ===============================
-# СТРАНИЦЫ
+# СТРАНИЦА
 # ===============================
 
 @app.get("/")
-async def root(request: Request):
-    if not request.cookies.get("token"):
-        return RedirectResponse("/login")
+async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
-@app.get("/login")
-async def login_page():
-    return FileResponse(os.path.join(BASE_DIR, "login.html"))
-
-@app.get("/register")
-async def register_page():
-    return FileResponse(os.path.join(BASE_DIR, "register.html"))
-
 # ===============================
-# ОБЩИЙ ЧАТ (НЕ ТРОНУТ)
+# ЧАТ (СТАБИЛЬНЫЙ, НЕ ТРОГАЕМ)
 # ===============================
 
 class Manager:
     def __init__(self):
-        self.clients: dict[WebSocket, str] = {}
+        self.clients = {}
 
     async def connect(self, ws: WebSocket):
         await ws.accept()
@@ -48,7 +42,7 @@ class Manager:
 manager = Manager()
 
 @app.websocket("/ws")
-async def ws(ws: WebSocket):
+async def websocket(ws: WebSocket):
     await manager.connect(ws)
     try:
         while True:
@@ -74,24 +68,26 @@ async def ws(ws: WebSocket):
         manager.disconnect(ws)
 
 # ===============================
-# АВТОРИЗАЦИЯ (RENDER SAFE)
+# АВТОРИЗАЦИЯ (РАБОЧАЯ)
 # ===============================
 
-# ⚠️ Render разрешает запись ТОЛЬКО в /tmp
-USERS_FILE = "/tmp/users.json"
+USERS_FILE = os.path.join(BASE_DIR, "users.json")
 
 def load_users():
     if not os.path.exists(USERS_FILE):
         return {}
-    with open(USERS_FILE, "r") as f:
-        return json.load(f)
+    try:
+        with open(USERS_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
 
 def save_users(users):
     with open(USERS_FILE, "w") as f:
         json.dump(users, f)
 
-def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+def hash_password(p: str) -> str:
+    return hashlib.sha256(p.encode()).hexdigest()
 
 @app.post("/register")
 async def register(data: dict = Body(...)):
@@ -99,12 +95,11 @@ async def register(data: dict = Body(...)):
     password = data.get("password")
 
     if not phone or not password:
-        return {"ok": False}
+        return {"status": "error"}
 
     users = load_users()
-
     if phone in users:
-        return {"ok": False}
+        return {"status": "error"}
 
     users[phone] = {
         "password": hash_password(password),
@@ -112,29 +107,32 @@ async def register(data: dict = Body(...)):
     }
 
     save_users(users)
-    return {"ok": True}
+    return {"status": "ok"}
 
 @app.post("/login")
-async def login(data: dict = Body(...), response: Response = Response()):
+async def login(data: dict = Body(...), response: Response = None):
     phone = data.get("phone")
     password = data.get("password")
 
-    users = load_users()
+    if not phone or not password:
+        return {"status": "error"}
 
+    users = load_users()
     if phone not in users:
-        return {"ok": False}
+        return {"status": "error"}
 
     if users[phone]["password"] != hash_password(password):
-        return {"ok": False}
+        return {"status": "error"}
 
     response.set_cookie(
         key="token",
         value=users[phone]["token"],
         httponly=True,
+        samesite="lax",
         max_age=60 * 60 * 24 * 365
     )
 
-    return {"ok": True}
+    return {"status": "ok"}
 
 # ===============================
 # ЗАПУСК
@@ -142,3 +140,4 @@ async def login(data: dict = Body(...), response: Response = Response()):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

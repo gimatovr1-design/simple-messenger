@@ -14,6 +14,7 @@ body {
     color: #fff;
     background: linear-gradient(120deg,#7f00ff,#00c6ff,#ff0080);
 }
+
 #loginBox {
     max-width: 320px;
     margin: auto;
@@ -21,14 +22,18 @@ body {
     padding: 20px;
     border-radius: 12px;
 }
+
 .layout { display: flex; gap: 10px; }
+
 #users {
     width: 160px;
     background: rgba(0,0,0,.45);
     padding: 8px;
     border-radius: 8px;
 }
+
 .chatBox { flex: 1; }
+
 #chat {
     height: 320px;
     overflow-y: auto;
@@ -36,8 +41,10 @@ body {
     border-radius: 8px;
     padding: 10px;
 }
+
 .msg { display: flex; margin-bottom: 8px; }
 .msg.me { flex-direction: row-reverse; }
+
 .avatar {
     width: 36px;
     height: 36px;
@@ -49,25 +56,30 @@ body {
     margin: 0 6px;
     font-weight: bold;
 }
+
 .bubble {
     max-width: 65%;
     padding: 6px 10px;
     border-radius: 10px;
     background: rgba(0,255,255,.35);
 }
+
 .msg.other .bubble {
     background: rgba(255,0,255,.35);
 }
+
 .system {
     text-align: center;
     font-size: 13px;
     opacity: .8;
 }
+
 .inputBox {
     display: flex;
     gap: 6px;
     margin-top: 6px;
 }
+
 #emojiPanel {
     display: none;
     background: rgba(0,0,0,.5);
@@ -77,12 +89,14 @@ body {
     max-height: 120px;
     overflow-y: auto;
 }
+
 #emojiPanel span {
     cursor: pointer;
     font-size: 20px;
     padding: 4px;
     display: inline-block;
 }
+
 input, button {
     width: 100%;
     padding: 8px;
@@ -93,41 +107,53 @@ input, button {
 
 <body>
 
+<!-- ===== ВХОД / РЕГИСТРАЦИЯ ===== -->
 <div id="loginBox">
     <h3 id="authTitle">Вход 🔐</h3>
+
     <input id="phoneInput" placeholder="Номер телефона">
     <input id="passwordInput" type="password" placeholder="Пароль">
+
     <button onclick="authSubmit()">Войти</button>
-    <div id="authSwitch" style="cursor:pointer;margin-top:10px;opacity:.85"
+
+    <div id="authSwitch"
+         style="cursor:pointer;margin-top:10px;opacity:.85"
          onclick="toggleAuth()">
         Нет аккаунта? Зарегистрироваться
     </div>
 </div>
 
+<!-- ===== НИК ===== -->
 <div id="nickBox" style="display:none">
     <input id="nickInput" placeholder="Введите ник">
     <button onclick="setNick()">OK</button>
 </div>
 
+<!-- ===== ЧАТ ===== -->
 <div id="chatApp" style="display:none">
 <div class="layout">
+
     <div id="users">
         <b>Онлайн</b>
         <ul id="userList"></ul>
     </div>
+
     <div class="chatBox">
         <div id="chat"></div>
         <div id="emojiPanel"></div>
+
         <div class="inputBox">
             <button onclick="toggleEmoji()">😀</button>
             <input id="messageInput" placeholder="Сообщение">
             <button onclick="sendMessage()">Отправить</button>
         </div>
     </div>
+
 </div>
 </div>
 
 <script>
+/* === DOM (ОБЯЗАТЕЛЬНО) === */
 const authTitle = document.getElementById("authTitle");
 const phoneInput = document.getElementById("phoneInput");
 const passwordInput = document.getElementById("passwordInput");
@@ -139,10 +165,12 @@ const messageInput = document.getElementById("messageInput");
 const emojiPanel = document.getElementById("emojiPanel");
 const chat = document.getElementById("chat");
 
+/* === STATE === */
 let myNick = "";
 let ws = null;
 let authMode = "login";
 
+/* === EMOJI === */
 const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤ 💔 💖 💕 💯 🔥 🎉".split(" ");
 
 function toggleAuth(){
@@ -167,9 +195,17 @@ function login(){
     })
     .then(r=>r.json())
     .then(d=>{
-        if(d.status!=="ok") return alert("Ошибка входа");
-        ws = new WebSocket((location.protocol==="https:"?"wss":"ws")+"://"+location.host+"/ws");
+        if(d.status !== "ok"){
+            alert("Ошибка входа ❌");
+            return;
+        }
+
+        ws = new WebSocket(
+            (location.protocol==="https:"?"wss":"ws")
+            + "://" + location.host + "/ws"
+        );
         ws.onmessage = handleWS;
+
         loginBox.style.display="none";
         chatApp.style.display="block";
         nickBox.style.display="block";
@@ -187,7 +223,10 @@ function register(){
     })
     .then(r=>r.json())
     .then(d=>{
-        if(d.status!=="ok") return alert("Ошибка регистрации");
+        if(d.status !== "ok"){
+            alert("Ошибка регистрации ❌");
+            return;
+        }
         alert("✅ Успешно зарегистрирован");
         toggleAuth();
     });
@@ -195,44 +234,46 @@ function register(){
 
 function setNick(){
     myNick = nickInput.value.trim();
-    if(myNick) ws.send("/nick "+myNick);
+    if(myNick) ws.send("/nick " + myNick);
     nickBox.style.display="none";
 }
 
 function handleWS(e){
     const d = JSON.parse(e.data);
-    if(d.type==="message"){
-        addMessage(d.nick,d.text,d.nick===myNick?"me":"other");
+    if(d.type === "message"){
+        addMessage(d.nick, d.text, d.nick === myNick ? "me" : "other");
     }
 }
 
 function sendMessage(){
     if(messageInput.value.trim()){
         ws.send(messageInput.value);
-        messageInput.value="";
+        messageInput.value = "";
     }
 }
 
-messageInput.onkeydown = e => e.key==="Enter" && sendMessage();
+messageInput.onkeydown = e => e.key === "Enter" && sendMessage();
 
-function addMessage(nick,text,side){
-    const m=document.createElement("div");
-    m.className="msg "+side;
-    m.innerHTML=`<div class="avatar">${nick[0]}</div>
-                 <div class="bubble"><b>${nick}</b><br>${text}</div>`;
+function addMessage(nick, text, side){
+    const m = document.createElement("div");
+    m.className = "msg " + side;
+    m.innerHTML = `
+        <div class="avatar">${nick[0]}</div>
+        <div class="bubble"><b>${nick}</b><br>${text}</div>
+    `;
     chat.appendChild(m);
-    chat.scrollTop=chat.scrollHeight;
+    chat.scrollTop = chat.scrollHeight;
 }
 
 function toggleEmoji(){
     emojiPanel.style.display =
-        emojiPanel.style.display==="block"?"none":"block";
+        emojiPanel.style.display === "block" ? "none" : "block";
 }
 
 emojis.forEach(e=>{
-    const s=document.createElement("span");
-    s.textContent=e;
-    s.onclick=()=>messageInput.value+=e;
+    const s = document.createElement("span");
+    s.textContent = e;
+    s.onclick = () => messageInput.value += e;
     emojiPanel.appendChild(s);
 });
 </script>
