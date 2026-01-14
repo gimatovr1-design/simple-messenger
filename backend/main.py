@@ -39,8 +39,8 @@ manager = Manager()
 
 @app.websocket("/ws")
 async def ws(ws: WebSocket):
-    phone = ws.query_params.get("phone")  # 🔹 ДОБАВЛЕНО
-    await manager.connect(ws, phone)      # 🔹 ИЗМЕНЕНО
+    phone = ws.query_params.get("phone")
+    await manager.connect(ws, phone)
 
     try:
         while True:
@@ -91,20 +91,22 @@ async def ws(ws: WebSocket):
         manager.disconnect(ws)
 
 # ===============================
-# АВТОРИЗАЦИЯ ПО НОМЕРУ (РАБОЧАЯ)
+# АВТОРИЗАЦИЯ ПО НОМЕРУ (ИСПРАВЛЕНА ОШИБКА)
 # ===============================
 
 USERS_FILE = os.path.join(BASE_DIR, "users.json")
 
 def load_users():
     if not os.path.exists(USERS_FILE):
+        with open(USERS_FILE, "w") as f:
+            json.dump({}, f)
         return {}
     with open(USERS_FILE, "r") as f:
         return json.load(f)
 
 def save_users(users):
     with open(USERS_FILE, "w") as f:
-        json.dump(users, f)
+        json.dump(users, f, ensure_ascii=False, indent=2)
 
 @app.post("/register")
 async def register(data: dict):
