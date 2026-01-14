@@ -39,7 +39,7 @@
 
 <script>
 let myNick = "";
-let users = new Set();
+let users = new Map();
 
 const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤ 💔 💖 💕 💯 🔥 🎉".split(" ");
 
@@ -57,8 +57,14 @@ ws.onmessage = (event) => {
         return;
     }
 
+    if (data.type === "status") {
+        users.set(data.nick, data.online);
+        renderUsers();
+        return;
+    }
+
     if (data.type === "message") {
-        users.add(data.nick);
+        users.set(data.nick, true);
         renderUsers();
         const side = data.nick === myNick ? "me" : "other";
         addMessage(data.nick, data.text, side);
@@ -134,9 +140,13 @@ function handleSystem(text) {
 
 function renderUsers() {
     userList.innerHTML = "";
-    users.forEach(u => {
+    users.forEach((online, nick) => {
         const li = document.createElement("li");
-        li.textContent = u;
+        li.innerHTML = `
+            <span style="color:${online ? 'lime' : 'red'}">
+                ${online ? '🟢' : '🔴'}
+            </span> ${nick}
+        `;
         userList.appendChild(li);
     });
 }

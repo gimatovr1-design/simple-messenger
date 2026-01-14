@@ -26,8 +26,10 @@ class Manager:
     async def broadcast(self, data, skip=None):
         for c in list(self.clients):
             if c != skip:
-                try: await c.send_json(data)
-                except: self.disconnect(c)
+                try:
+                    await c.send_json(data)
+                except:
+                    self.disconnect(c)
 
 manager = Manager()
 
@@ -39,29 +41,49 @@ async def ws(ws: WebSocket):
             msg = await ws.receive_text()
 
             if msg.startswith("/nick "):
-                manager.clients[ws] = msg[6:]
-                await manager.send(ws, {"type":"system","text":"✅ Ник установлен"})
+                nick = msg[6:]
+                manager.clients[ws] = nick
+
+                await manager.send(ws, {
+                    "type": "system",
+                    "text": "✅ Ник установлен"
+                })
+
+                # 🟢 ONLINE
+                await manager.broadcast({
+                    "type": "status",
+                    "nick": nick,
+                    "online": True
+                })
                 continue
 
             try:
                 data = json.loads(msg)
             except:
                 await manager.broadcast({
-                    "type":"message",
-                    "nick": manager.clients.get(ws,""),
+                    "type": "message",
+                    "nick": manager.clients.get(ws, ""),
                     "text": msg
                 })
                 continue
 
-            data["from"] = manager.clients.get(ws,"")
+            data["from"] = manager.clients.get(ws, "")
             if "to" in data:
-                for c,n in manager.clients.items():
+                for c, n in manager.clients.items():
                     if n == data["to"]:
                         await manager.send(c, data)
             else:
                 await manager.broadcast(data, skip=ws)
 
     except WebSocketDisconnect:
+        nick = manager.clients.get(ws)
+        if nick:
+            # 🔴 OFFLINE
+            await manager.broadcast({
+                "type": "status",
+                "nick": nick,
+                "online": False
+            })
         manager.disconnect(ws)
 
 if __name__ == "__main__":
