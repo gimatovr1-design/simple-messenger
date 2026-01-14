@@ -1,6 +1,6 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
-from fastapi.responses import FileResponse
-import uvicorn, os, json
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response, Request
+from fastapi.responses import FileResponse, RedirectResponse
+import uvicorn, os, json, uuid
 
 app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -10,7 +10,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # ===============================
 
 @app.get("/")
-async def root():
+async def root(request: Request):
+    if not request.cookies.get("token"):
+        return RedirectResponse("/login")
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 @app.get("/login")
@@ -36,16 +38,12 @@ class Manager:
     def disconnect(self, ws: WebSocket):
         self.clients.pop(ws, None)
 
-    async def send(self, ws, data):
-        await ws.send_json(data)
-
-    async def broadcast(self, data, skip=None):
+    async def broadcast(self, data):
         for c in list(self.clients):
-            if c != skip:
-                try:
-                    await c.send_json(data)
-                except:
-                    self.disconnect(c)
+            try:
+                await c.send_json(data)
+            except:
+                self.disconnect(c)
 
 manager = Manager()
 
@@ -59,17 +57,8 @@ async def ws(ws: WebSocket):
             if msg.startswith("/nick "):
                 nick = msg[6:]
                 manager.clients[ws] = nick
-
-                await manager.send(ws, {
-                    "type": "system",
-                    "text": "✅ Ник установлен"
-                })
-
-                await manager.broadcast({
-                    "type": "status",
-                    "nick": nick,
-                    "online": True
-                })
+                await ws.send_json({"type": "system", "text": "✅ Ник установлен"})
+                await manager.broadcast({"type": "status", "nick": nick, "online": True})
                 continue
 
             await manager.broadcast({
@@ -81,15 +70,11 @@ async def ws(ws: WebSocket):
     except WebSocketDisconnect:
         nick = manager.clients.get(ws)
         if nick:
-            await manager.broadcast({
-                "type": "status",
-                "nick": nick,
-                "online": False
-            })
+            await manager.broadcast({"type": "status", "nick": nick, "online": False})
         manager.disconnect(ws)
 
 # ===============================
-# АВТОРИЗАЦИЯ ПО НОМЕРУ (ИСПРАВЛЕНО)
+# АВТОРИЗАЦИЯ (ВЕЧНАЯ)
 # ===============================
 
 USERS_FILE = os.path.join(BASE_DIR, "users.json")
@@ -110,27 +95,34 @@ async def register(data: dict = Body(...)):
     password = data.get("password")
 
     users = load_users()
-
     if phone in users:
         return {"ok": False}
 
-    users[phone] = {"password": password}
+    users[phone] = {
+        "password": password,
+        "token": str(uuid.uuid4())
+    }
     save_users(users)
     return {"ok": True}
 
 @app.post("/login")
-async def login(data: dict = Body(...)):
+async def login(data: dict = Body(...), response: Response = None):
     phone = data.get("phone")
     password = data.get("password")
 
     users = load_users()
-
     if phone not in users:
         return {"ok": False}
 
     if users[phone]["password"] != password:
         return {"ok": False}
 
+    response.set_cookie(
+        key="token",
+        value=users[phone]["token"],
+        httponly=True,
+        max_age=60 * 60 * 24 * 365  # 1 год
+    )
     return {"ok": True}
 
 # ===============================
