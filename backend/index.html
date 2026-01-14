@@ -72,6 +72,7 @@ body {
     text-align: center;
     font-size: 13px;
     opacity: .8;
+    margin: 6px 0;
 }
 
 .inputBox {
@@ -109,17 +110,9 @@ input, button {
 
 <div id="loginBox">
     <h3 id="authTitle">Вход 🔐</h3>
-
     <input id="phoneInput" placeholder="Номер телефона">
     <input id="passwordInput" type="password" placeholder="Пароль">
-
     <button onclick="authSubmit()">Войти</button>
-
-    <div id="authSwitch"
-         style="cursor:pointer;margin-top:10px;opacity:.85"
-         onclick="toggleAuth()">
-        Нет аккаунта? Зарегистрироваться
-    </div>
 </div>
 
 <div id="nickBox" style="display:none">
@@ -160,25 +153,15 @@ const nickInput = document.getElementById("nickInput");
 const messageInput = document.getElementById("messageInput");
 const emojiPanel = document.getElementById("emojiPanel");
 const chat = document.getElementById("chat");
+const userList = document.getElementById("userList");
 
 let myNick = "";
 let ws = null;
-let authMode = "login";
+let onlineUsers = {};
 
 const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤ 💔 💖 💕 💯 🔥 🎉".split(" ");
 
-function toggleAuth(){
-    authMode = authMode === "login" ? "register" : "login";
-    authTitle.innerText = authMode === "login" ? "Вход 🔐" : "Регистрация 📱";
-    document.querySelector("#loginBox button").innerText =
-        authMode === "login" ? "Войти" : "Зарегистрироваться";
-}
-
 function authSubmit(){
-    authMode === "login" ? login() : register();
-}
-
-function login(){
     fetch("/login", {
         method:"POST",
         headers:{ "Content-Type":"application/json" },
@@ -189,10 +172,7 @@ function login(){
     })
     .then(r=>r.json())
     .then(d=>{
-        if(d.status !== "ok"){
-            alert("Ошибка входа ❌");
-            return;
-        }
+        if(d.status!=="ok") return alert("Ошибка входа");
 
         ws = new WebSocket(
             (location.protocol==="https:"?"wss":"ws")
@@ -206,26 +186,6 @@ function login(){
     });
 }
 
-function register(){
-    fetch("/register", {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({
-            phone: phoneInput.value.trim(),
-            password: passwordInput.value.trim()
-        })
-    })
-    .then(r=>r.json())
-    .then(d=>{
-        if(d.status !== "ok"){
-            alert("Ошибка регистрации ❌");
-            return;
-        }
-        alert("✅ Успешно зарегистрирован");
-        toggleAuth();
-    });
-}
-
 function setNick(){
     myNick = nickInput.value.trim();
     if(myNick) ws.send("/nick " + myNick);
@@ -234,46 +194,71 @@ function setNick(){
 
 function handleWS(e){
     const d = JSON.parse(e.data);
-    if(d.type === "message"){
-        addMessage(d.nick, d.text, d.nick === myNick ? "me" : "other");
+
+    if(d.type==="message"){
+        addMessage(d.nick,d.text,d.nick===myNick?"me":"other");
+    }
+
+    if(d.type==="status"){
+        if(d.online){
+            onlineUsers[d.nick] = true;
+        } else {
+            delete onlineUsers[d.nick];
+        }
+        renderUsers();
+        addSystem(d.nick + (d.online ? " 🟢 онлайн" : " 🔴 офлайн"));
     }
 }
 
 function sendMessage(){
     if(messageInput.value.trim()){
         ws.send(messageInput.value);
-        messageInput.value = "";
+        messageInput.value="";
     }
 }
 
-/* ✅ ЕДИНСТВЕННОЕ ИСПРАВЛЕНИЕ — ЧТОБ ТЕКСТ ПЕЧАТАЛСЯ */
-messageInput.addEventListener("keydown", e => {
-    if (e.key === "Enter") {
+messageInput.addEventListener("keydown", e=>{
+    if(e.key==="Enter"){
         e.preventDefault();
         sendMessage();
     }
 });
 
-function addMessage(nick, text, side){
-    const m = document.createElement("div");
-    m.className = "msg " + side;
-    m.innerHTML = `
-        <div class="avatar">${nick[0]}</div>
-        <div class="bubble"><b>${nick}</b><br>${text}</div>
-    `;
+function addMessage(nick,text,side){
+    const m=document.createElement("div");
+    m.className="msg "+side;
+    m.innerHTML=`<div class="avatar">${nick[0]}</div>
+                 <div class="bubble"><b>${nick}</b><br>${text}</div>`;
     chat.appendChild(m);
-    chat.scrollTop = chat.scrollHeight;
+    chat.scrollTop=chat.scrollHeight;
+}
+
+function addSystem(text){
+    const d=document.createElement("div");
+    d.className="system";
+    d.textContent=text;
+    chat.appendChild(d);
+    chat.scrollTop=chat.scrollHeight;
+}
+
+function renderUsers(){
+    userList.innerHTML="";
+    Object.keys(onlineUsers).forEach(n=>{
+        const li=document.createElement("li");
+        li.textContent="🟢 "+n;
+        userList.appendChild(li);
+    });
 }
 
 function toggleEmoji(){
     emojiPanel.style.display =
-        emojiPanel.style.display === "block" ? "none" : "block";
+        emojiPanel.style.display==="block"?"none":"block";
 }
 
 emojis.forEach(e=>{
-    const s = document.createElement("span");
-    s.textContent = e;
-    s.onclick = () => messageInput.value += e;
+    const s=document.createElement("span");
+    s.textContent=e;
+    s.onclick=()=>messageInput.value+=e;
     emojiPanel.appendChild(s);
 });
 </script>
