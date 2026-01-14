@@ -9,13 +9,17 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
+# ===============================
+# ОБЩИЙ ЧАТ (БЕЗ ЛОМКИ)
+# ===============================
+
 class Manager:
     def __init__(self):
         self.clients: dict[WebSocket, str] = {}
 
-    async def connect(self, ws: WebSocket):
+    async def connect(self, ws: WebSocket, phone: str | None = None):
         await ws.accept()
-        self.clients[ws] = ""
+        self.clients[ws] = phone or ""
 
     def disconnect(self, ws: WebSocket):
         self.clients.pop(ws, None)
@@ -35,7 +39,9 @@ manager = Manager()
 
 @app.websocket("/ws")
 async def ws(ws: WebSocket):
-    await manager.connect(ws)
+    phone = ws.query_params.get("phone")  # 🔹 ДОБАВЛЕНО
+    await manager.connect(ws, phone)      # 🔹 ИЗМЕНЕНО
+
     try:
         while True:
             msg = await ws.receive_text()
@@ -49,7 +55,6 @@ async def ws(ws: WebSocket):
                     "text": "✅ Ник установлен"
                 })
 
-                # 🟢 ONLINE
                 await manager.broadcast({
                     "type": "status",
                     "nick": nick,
@@ -78,7 +83,6 @@ async def ws(ws: WebSocket):
     except WebSocketDisconnect:
         nick = manager.clients.get(ws)
         if nick:
-            # 🔴 OFFLINE
             await manager.broadcast({
                 "type": "status",
                 "nick": nick,
@@ -86,11 +90,8 @@ async def ws(ws: WebSocket):
             })
         manager.disconnect(ws)
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
 # ===============================
-# АВТОРИЗАЦИЯ ПО НОМЕРУ
+# АВТОРИЗАЦИЯ ПО НОМЕРУ (РАБОЧАЯ)
 # ===============================
 
 USERS_FILE = os.path.join(BASE_DIR, "users.json")
@@ -105,7 +106,6 @@ def save_users(users):
     with open(USERS_FILE, "w") as f:
         json.dump(users, f)
 
-
 @app.post("/register")
 async def register(data: dict):
     phone = data.get("phone")
@@ -118,9 +118,7 @@ async def register(data: dict):
 
     users[phone] = {"password": password}
     save_users(users)
-
     return {"ok": True}
-
 
 @app.post("/login")
 async def login(data: dict):
@@ -134,9 +132,8 @@ async def login(data: dict):
 
     return {"ok": True}
 
-
 # ===============================
-# ПРИВАТНЫЕ ЧАТЫ 1-на-1
+# ПРИВАТНЫЕ ЧАТЫ 1-на-1 (БЕЗ ИЗМЕНЕНИЙ)
 # ===============================
 
 class PrivateManager:
@@ -158,14 +155,11 @@ class PrivateManager:
                     "text": text
                 })
 
-
 private_manager = PrivateManager()
-
 
 @app.websocket("/ws-private/{phone}")
 async def ws_private(ws: WebSocket, phone: str):
     await private_manager.connect(ws, phone)
-
     try:
         while True:
             data = await ws.receive_json()
@@ -177,7 +171,5 @@ async def ws_private(ws: WebSocket, phone: str):
     except WebSocketDisconnect:
         private_manager.disconnect(ws)
 
-
-@app.get("/login")
-async def login_page():
-    return FileResponse(os.path.join(BASE_DIR, "login.html"))
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
