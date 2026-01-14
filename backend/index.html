@@ -14,7 +14,6 @@ body {
     color: #fff;
     background: linear-gradient(120deg,#7f00ff,#00c6ff,#ff0080);
 }
-
 #loginBox {
     max-width: 320px;
     margin: auto;
@@ -22,18 +21,14 @@ body {
     padding: 20px;
     border-radius: 12px;
 }
-
 .layout { display: flex; gap: 10px; }
-
 #users {
     width: 160px;
     background: rgba(0,0,0,.45);
     padding: 8px;
     border-radius: 8px;
 }
-
 .chatBox { flex: 1; }
-
 #chat {
     height: 320px;
     overflow-y: auto;
@@ -41,10 +36,8 @@ body {
     border-radius: 8px;
     padding: 10px;
 }
-
 .msg { display: flex; margin-bottom: 8px; }
 .msg.me { flex-direction: row-reverse; }
-
 .avatar {
     width: 36px;
     height: 36px;
@@ -56,30 +49,25 @@ body {
     margin: 0 6px;
     font-weight: bold;
 }
-
 .bubble {
     max-width: 65%;
     padding: 6px 10px;
     border-radius: 10px;
     background: rgba(0,255,255,.35);
 }
-
 .msg.other .bubble {
     background: rgba(255,0,255,.35);
 }
-
 .system {
     text-align: center;
     font-size: 13px;
     opacity: .8;
 }
-
 .inputBox {
     display: flex;
     gap: 6px;
     margin-top: 6px;
 }
-
 #emojiPanel {
     display: none;
     background: rgba(0,0,0,.5);
@@ -89,14 +77,12 @@ body {
     max-height: 120px;
     overflow-y: auto;
 }
-
 #emojiPanel span {
     cursor: pointer;
     font-size: 20px;
     padding: 4px;
     display: inline-block;
 }
-
 input, button {
     width: 100%;
     padding: 8px;
@@ -107,69 +93,61 @@ input, button {
 
 <body>
 
-<!-- ===== ВХОД / РЕГИСТРАЦИЯ ===== -->
 <div id="loginBox">
     <h3 id="authTitle">Вход 🔐</h3>
-
     <input id="phoneInput" placeholder="Номер телефона">
     <input id="passwordInput" type="password" placeholder="Пароль">
-
     <button onclick="authSubmit()">Войти</button>
-
-    <div id="authSwitch"
-         style="cursor:pointer;margin-top:10px;opacity:.85"
+    <div id="authSwitch" style="cursor:pointer;margin-top:10px;opacity:.85"
          onclick="toggleAuth()">
         Нет аккаунта? Зарегистрироваться
     </div>
 </div>
 
-<!-- ===== НИК ===== -->
 <div id="nickBox" style="display:none">
     <input id="nickInput" placeholder="Введите ник">
     <button onclick="setNick()">OK</button>
 </div>
 
-<!-- ===== ЧАТ ===== -->
 <div id="chatApp" style="display:none">
-
 <div class="layout">
-
     <div id="users">
         <b>Онлайн</b>
         <ul id="userList"></ul>
     </div>
-
     <div class="chatBox">
         <div id="chat"></div>
-
         <div id="emojiPanel"></div>
-
         <div class="inputBox">
             <button onclick="toggleEmoji()">😀</button>
-            <input type="file" id="fileInput" accept="image/*,video/*">
             <input id="messageInput" placeholder="Сообщение">
             <button onclick="sendMessage()">Отправить</button>
         </div>
     </div>
-
 </div>
 </div>
 
 <script>
+const authTitle = document.getElementById("authTitle");
+const phoneInput = document.getElementById("phoneInput");
+const passwordInput = document.getElementById("passwordInput");
+const loginBox = document.getElementById("loginBox");
+const chatApp = document.getElementById("chatApp");
+const nickBox = document.getElementById("nickBox");
+const nickInput = document.getElementById("nickInput");
+const messageInput = document.getElementById("messageInput");
+const emojiPanel = document.getElementById("emojiPanel");
+const chat = document.getElementById("chat");
+
 let myNick = "";
 let ws = null;
 let authMode = "login";
-let users = new Map();
 
 const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤ 💔 💖 💕 💯 🔥 🎉".split(" ");
 
 function toggleAuth(){
     authMode = authMode === "login" ? "register" : "login";
     authTitle.innerText = authMode === "login" ? "Вход 🔐" : "Регистрация 📱";
-    authSwitch.innerText =
-        authMode === "login"
-        ? "Нет аккаунта? Зарегистрироваться"
-        : "Уже есть аккаунт? Войти";
     document.querySelector("#loginBox button").innerText =
         authMode === "login" ? "Войти" : "Зарегистрироваться";
 }
@@ -190,13 +168,8 @@ function login(){
     .then(r=>r.json())
     .then(d=>{
         if(d.status!=="ok") return alert("Ошибка входа");
-
-        ws = new WebSocket(
-            (location.protocol==="https:"?"wss":"ws")
-            + "://" + location.host + "/ws"
-        );
+        ws = new WebSocket((location.protocol==="https:"?"wss":"ws")+"://"+location.host+"/ws");
         ws.onmessage = handleWS;
-
         loginBox.style.display="none";
         chatApp.style.display="block";
         nickBox.style.display="block";
