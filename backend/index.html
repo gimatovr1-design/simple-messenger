@@ -8,12 +8,23 @@
 
 <body>
 
+<!-- ===== ВХОД ПО НОМЕРУ ===== -->
+<div id="loginBox">
+    <h3>Вход 🔐</h3>
+    <input id="phoneInput" placeholder="Номер телефона">
+    <input id="passwordInput" type="password" placeholder="Пароль">
+    <button onclick="login()">Войти</button>
+</div>
+
 <h3>Добро пожаловать в чат 👋</h3>
 
-<div id="nickBox">
+<div id="nickBox" style="display:none">
     <input id="nickInput" placeholder="Введите ник" autocomplete="off">
     <button onclick="setNick()">OK</button>
 </div>
+
+<!-- ===== ЧАТ ===== -->
+<div id="chatApp" style="display:none">
 
 <div class="layout">
 
@@ -36,19 +47,43 @@
     </div>
 
 </div>
+</div>
 
 <script>
 let myNick = "";
+let myPhone = "";
 let users = new Map();
+let ws = null;
 
 const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤ 💔 💖 💕 💯 🔥 🎉".split(" ");
 
-let ws = new WebSocket(
-    (location.protocol === "https:" ? "wss://" : "ws://") +
-    location.host + "/ws"
-);
+function login() {
+    const phone = phoneInput.value.trim();
+    const password = passwordInput.value.trim();
+    if (!phone || !password) return alert("Введите номер и пароль");
 
-ws.onmessage = (event) => {
+    fetch("/login", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({phone, password})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.ok) return alert("Ошибка входа");
+
+        myPhone = phone;
+
+        const protocol = location.protocol === "https:" ? "wss" : "ws";
+        ws = new WebSocket(`${protocol}://${location.host}/ws?phone=${phone}`);
+        ws.onmessage = handleWS;
+
+        loginBox.style.display = "none";
+        chatApp.style.display = "block";
+        nickBox.style.display = "block";
+    });
+}
+
+function handleWS(event) {
     let data;
     try { data = JSON.parse(event.data); } catch { return; }
 
@@ -69,7 +104,7 @@ ws.onmessage = (event) => {
         const side = data.nick === myNick ? "me" : "other";
         addMessage(data.nick, data.text, side);
     }
-};
+}
 
 function setNick() {
     const nick = nickInput.value.trim();
@@ -253,6 +288,7 @@ body {
 
 input, button {
     padding: 6px;
+    margin: 4px 0;
 }
 </style>
 
