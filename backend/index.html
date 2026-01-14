@@ -8,12 +8,20 @@
 
 <body>
 
-<!-- ===== ВХОД ПО НОМЕРУ ===== -->
+<!-- ===== ВХОД / РЕГИСТРАЦИЯ ===== -->
 <div id="loginBox">
-    <h3>Вход 🔐</h3>
+    <h3 id="authTitle">Вход 🔐</h3>
+
     <input id="phoneInput" placeholder="Номер телефона">
     <input id="passwordInput" type="password" placeholder="Пароль">
-    <button onclick="login()">Войти</button>
+
+    <button onclick="authSubmit()">Войти</button>
+
+    <div id="authSwitch"
+         style="cursor:pointer;margin-top:10px;opacity:.85"
+         onclick="toggleAuth()">
+        Нет аккаунта? Зарегистрироваться
+    </div>
 </div>
 
 <h3>Добро пожаловать в чат 👋</h3>
@@ -54,9 +62,34 @@ let myNick = "";
 let myPhone = "";
 let users = new Map();
 let ws = null;
+let authMode = "login"; // login | register
 
 const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤ 💔 💖 💕 💯 🔥 🎉".split(" ");
 
+function toggleAuth(){
+    authMode = authMode === "login" ? "register" : "login";
+
+    authTitle.innerText =
+        authMode === "login" ? "Вход 🔐" : "Регистрация 📱";
+
+    authSwitch.innerText =
+        authMode === "login"
+        ? "Нет аккаунта? Зарегистрироваться"
+        : "Уже есть аккаунт? Войти";
+
+    document.querySelector("#loginBox button").innerText =
+        authMode === "login" ? "Войти" : "Зарегистрироваться";
+}
+
+function authSubmit(){
+    if(authMode === "login"){
+        login();
+    } else {
+        register();
+    }
+}
+
+/* ===== ВХОД (ТВОЙ, НЕ ЛОМАЛИ) ===== */
 function login() {
     const phone = phoneInput.value.trim();
     const password = passwordInput.value.trim();
@@ -69,7 +102,7 @@ function login() {
     })
     .then(r => r.json())
     .then(data => {
-        if (!data.ok) return alert("Ошибка входа");
+        if (data.status !== "ok") return alert("Ошибка входа");
 
         myPhone = phone;
 
@@ -80,6 +113,27 @@ function login() {
         loginBox.style.display = "none";
         chatApp.style.display = "block";
         nickBox.style.display = "block";
+    });
+}
+
+/* ===== РЕГИСТРАЦИЯ (ДОБАВЛЕНО) ===== */
+function register(){
+    const phone = phoneInput.value.trim();
+    const password = passwordInput.value.trim();
+    if (!phone || !password) return alert("Введите номер и пароль");
+
+    fetch("/register", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ phone, password })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status !== "ok")
+            return alert(data.error || "Ошибка регистрации");
+
+        alert("✅ Регистрация успешна");
+        toggleAuth(); // после регистрации → вход
     });
 }
 
