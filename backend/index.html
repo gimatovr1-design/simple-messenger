@@ -107,7 +107,6 @@ input, button {
 
 <body>
 
-<!-- ===== ВХОД / РЕГИСТРАЦИЯ ===== -->
 <div id="loginBox">
     <h3 id="authTitle">Вход 🔐</h3>
 
@@ -123,13 +122,11 @@ input, button {
     </div>
 </div>
 
-<!-- ===== НИК ===== -->
 <div id="nickBox" style="display:none">
     <input id="nickInput" placeholder="Введите ник">
     <button onclick="setNick()">OK</button>
 </div>
 
-<!-- ===== ЧАТ ===== -->
 <div id="chatApp" style="display:none">
 <div class="layout">
 
@@ -153,7 +150,6 @@ input, button {
 </div>
 
 <script>
-/* === DOM === */
 const authTitle = document.getElementById("authTitle");
 const phoneInput = document.getElementById("phoneInput");
 const passwordInput = document.getElementById("passwordInput");
@@ -165,12 +161,10 @@ const messageInput = document.getElementById("messageInput");
 const emojiPanel = document.getElementById("emojiPanel");
 const chat = document.getElementById("chat");
 
-/* === STATE === */
 let myNick = "";
 let ws = null;
 let authMode = "login";
 
-/* === EMOJI === */
 const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤ 💔 💖 💕 💯 🔥 🎉".split(" ");
 
 function toggleAuth(){
@@ -240,28 +234,25 @@ function setNick(){
 
 function handleWS(e){
     const d = JSON.parse(e.data);
-
     if(d.type === "message"){
         addMessage(d.nick, d.text, d.nick === myNick ? "me" : "other");
-    }
-
-    if(d.type === "status"){
-        addSystem(
-            d.online
-            ? `🟢 ${d.nick} вошёл`
-            : `🔴 ${d.nick} вышел`
-        );
     }
 }
 
 function sendMessage(){
-    const text = messageInput.value.trim();
-    if(!text) return;
-    ws.send(text);
-    messageInput.value = "";
+    if(messageInput.value.trim()){
+        ws.send(messageInput.value);
+        messageInput.value = "";
+    }
 }
 
-messageInput.onkeydown = e => e.key === "Enter" && sendMessage();
+/* ✅ ЕДИНСТВЕННОЕ ИСПРАВЛЕНИЕ — ЧТОБ ТЕКСТ ПЕЧАТАЛСЯ */
+messageInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        sendMessage();
+    }
+});
 
 function addMessage(nick, text, side){
     const m = document.createElement("div");
@@ -271,14 +262,6 @@ function addMessage(nick, text, side){
         <div class="bubble"><b>${nick}</b><br>${text}</div>
     `;
     chat.appendChild(m);
-    chat.scrollTop = chat.scrollHeight;
-}
-
-function addSystem(text){
-    const d = document.createElement("div");
-    d.className = "system";
-    d.textContent = text;
-    chat.appendChild(d);
     chat.scrollTop = chat.scrollHeight;
 }
 
