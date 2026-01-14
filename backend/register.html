@@ -7,7 +7,7 @@
 <style>
 body{
     font-family: system-ui;
-    background: linear-gradient(120deg,#7f00ff,#00c6ff,#ff0080);
+    background: linear-gradient(120deg,#00c6ff,#7f00ff,#ff0080);
     color:#fff;
     display:flex;
     align-items:center;
@@ -31,10 +31,8 @@ input,button{
 
 <div class="box">
     <h3>Регистрация 📱</h3>
-
     <input id="phone" placeholder="Номер телефона">
     <input id="password" type="password" placeholder="Пароль">
-
     <button onclick="register()">Зарегистрироваться</button>
 </div>
 
@@ -48,19 +46,19 @@ async function register(){
         return;
     }
 
-    const res = await fetch("/register",{
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
+    const res = await fetch("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, password })
     });
 
     const data = await res.json();
 
     if(data.ok){
-        alert("✅ Успешно зарегистрирован");
+        alert("✅ Регистрация успешна");
         window.location.href = "/login";
     } else {
-        alert("❌ Такой пользователь уже есть");
+        alert(data.error || "Ошибка регистрации");
     }
 }
 </script>
