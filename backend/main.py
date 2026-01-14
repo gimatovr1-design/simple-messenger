@@ -74,10 +74,11 @@ async def ws(ws: WebSocket):
         manager.disconnect(ws)
 
 # ===============================
-# АВТОРИЗАЦИЯ (РАБОЧАЯ)
+# АВТОРИЗАЦИЯ (RENDER SAFE)
 # ===============================
 
-USERS_FILE = os.path.join(BASE_DIR, "users.json")
+# ⚠️ Render разрешает запись ТОЛЬКО в /tmp
+USERS_FILE = "/tmp/users.json"
 
 def load_users():
     if not os.path.exists(USERS_FILE):
@@ -98,12 +99,12 @@ async def register(data: dict = Body(...)):
     password = data.get("password")
 
     if not phone or not password:
-        return {"ok": False, "error": "empty"}
+        return {"ok": False}
 
     users = load_users()
 
     if phone in users:
-        return {"ok": False, "error": "exists"}
+        return {"ok": False}
 
     users[phone] = {
         "password": hash_password(password),
@@ -141,4 +142,3 @@ async def login(data: dict = Body(...), response: Response = Response()):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
