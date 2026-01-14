@@ -79,7 +79,7 @@ async def ws(ws: WebSocket):
         manager.disconnect(ws)
 
 # ===============================
-# АВТОРИЗАЦИЯ (ФИКС)
+# АВТОРИЗАЦИЯ ПО НОМЕРУ (ФИКС)
 # ===============================
 
 USERS_FILE = os.path.join(BASE_DIR, "users.json")
@@ -98,9 +98,16 @@ def save_users(users):
 
 @app.post("/register")
 async def register(request: Request):
-    form = await request.form()
-    phone = form.get("phone")
-    password = form.get("password")
+    try:
+        data = await request.form()
+    except:
+        data = await request.json()
+
+    phone = data.get("phone")
+    password = data.get("password")
+
+    if not phone or not password:
+        return {"ok": False}
 
     users = load_users()
 
@@ -113,9 +120,16 @@ async def register(request: Request):
 
 @app.post("/login")
 async def login(request: Request):
-    form = await request.form()
-    phone = form.get("phone")
-    password = form.get("password")
+    try:
+        data = await request.form()
+    except:
+        data = await request.json()
+
+    phone = data.get("phone")
+    password = data.get("password")
+
+    if not phone or not password:
+        return {"ok": False}
 
     users = load_users()
 
