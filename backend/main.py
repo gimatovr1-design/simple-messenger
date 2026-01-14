@@ -176,3 +176,8 @@ async def ws_private(ws: WebSocket, phone: str):
             )
     except WebSocketDisconnect:
         private_manager.disconnect(ws)
+
+
+@app.get("/login")
+async def login_page():
+    return FileResponse(os.path.join(BASE_DIR, "login.html"))

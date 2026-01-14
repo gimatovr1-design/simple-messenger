@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Вход</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{
+    font-family: system-ui;
+    background: linear-gradient(120deg,#7f00ff,#00c6ff,#ff0080);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100vh;
+}
+.box{
+    background:rgba(0,0,0,.4);
+    padding:20px;
+    border-radius:12px;
+    width:280px;
+}
+input,button{
+    width:100%;
+    padding:10px;
+    margin-top:10px;
+}
+</style>
+</head>
+<body>
+
+<div class="box">
+    <h3>Вход по номеру 📱</h3>
+    <input id="phone" placeholder="Номер">
+    <input id="password" type="password" placeholder="Пароль">
+    <button onclick="login()">Войти</button>
+</div>
+
+<script>
+async function login(){
+    const phone = document.getElementById("phone").value.trim();
+    const password = document.getElementById("password").value.trim();
+
+    if(!phone || !password){
+        alert("Заполни номер и пароль");
+        return;
+    }
+
+    const res = await fetch("/login",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ phone, password })
+    });
+
+    const data = await res.json();
+
+    if(data.ok){
+        localStorage.setItem("phone", phone);
+        window.location.href = "/private";
+    } else {
+        alert("Ошибка входа");
+    }
+}
+</script>
+
+</body>
+</html>
