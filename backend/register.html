@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Регистрация</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{
+    font-family: system-ui;
+    background: linear-gradient(120deg,#7f00ff,#00c6ff,#ff0080);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100vh;
+}
+.box{
+    background:rgba(0,0,0,.4);
+    padding:20px;
+    border-radius:12px;
+    width:280px;
+}
+input,button{
+    width:100%;
+    padding:10px;
+    margin-top:10px;
+}
+</style>
+</head>
+<body>
+
+<div class="box">
+    <h3>Регистрация 📱</h3>
+
+    <input id="phone" placeholder="Номер телефона">
+    <input id="password" type="password" placeholder="Пароль">
+
+    <button onclick="register()">Зарегистрироваться</button>
+</div>
+
+<script>
+async function register(){
+    const phone = document.getElementById("phone").value.trim();
+    const password = document.getElementById("password").value.trim();
+
+    if(!phone || !password){
+        alert("Заполни номер и пароль");
+        return;
+    }
+
+    const res = await fetch("/register",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ phone, password })
+    });
+
+    const data = await res.json();
+
+    if(data.ok){
+        alert("✅ Успешно зарегистрирован");
+        window.location.href = "/login";
+    } else {
+        alert("❌ Такой пользователь уже есть");
+    }
+}
+</script>
+
+</body>
+</html>

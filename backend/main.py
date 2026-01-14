@@ -5,12 +5,24 @@ import uvicorn, os, json
 app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# ===============================
+# СТРАНИЦЫ
+# ===============================
+
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
+@app.get("/login")
+async def login_page():
+    return FileResponse(os.path.join(BASE_DIR, "login.html"))
+
+@app.get("/register")
+async def register_page():
+    return FileResponse(os.path.join(BASE_DIR, "register.html"))
+
 # ===============================
-# ОБЩИЙ ЧАТ (БЕЗ ИЗМЕНЕНИЙ)
+# ОБЩИЙ ЧАТ (ТВОЙ, БЕЗ ЛОМКИ)
 # ===============================
 
 class Manager:
@@ -79,7 +91,7 @@ async def ws(ws: WebSocket):
         manager.disconnect(ws)
 
 # ===============================
-# АВТОРИЗАЦИЯ ПО НОМЕРУ (ФИКС)
+# АВТОРИЗАЦИЯ ПО НОМЕРУ (РАБОЧАЯ)
 # ===============================
 
 USERS_FILE = os.path.join(BASE_DIR, "users.json")
@@ -98,11 +110,7 @@ def save_users(users):
 
 @app.post("/register")
 async def register(request: Request):
-    try:
-        data = await request.form()
-    except:
-        data = await request.json()
-
+    data = await request.json()
     phone = data.get("phone")
     password = data.get("password")
 
@@ -112,7 +120,7 @@ async def register(request: Request):
     users = load_users()
 
     if phone in users:
-        return {"ok": False, "error": "exists"}
+        return {"ok": False}
 
     users[phone] = {"password": password}
     save_users(users)
@@ -120,16 +128,9 @@ async def register(request: Request):
 
 @app.post("/login")
 async def login(request: Request):
-    try:
-        data = await request.form()
-    except:
-        data = await request.json()
-
+    data = await request.json()
     phone = data.get("phone")
     password = data.get("password")
-
-    if not phone or not password:
-        return {"ok": False}
 
     users = load_users()
 
@@ -144,3 +145,4 @@ async def login(request: Request):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
