@@ -72,6 +72,7 @@ body {
     text-align: center;
     font-size: 13px;
     opacity: .8;
+    margin: 6px 0;
 }
 
 .inputBox {
@@ -160,6 +161,7 @@ const nickInput = document.getElementById("nickInput");
 const messageInput = document.getElementById("messageInput");
 const emojiPanel = document.getElementById("emojiPanel");
 const chat = document.getElementById("chat");
+const userList = document.getElementById("userList");
 
 let myNick = "";
 let ws = null;
@@ -193,6 +195,9 @@ function login(){
             alert("Ошибка входа ❌");
             return;
         }
+
+        localStorage.setItem("auth_phone", phoneInput.value.trim());
+        localStorage.setItem("auth_pass", passwordInput.value.trim());
 
         ws = new WebSocket(
             (location.protocol==="https:"?"wss":"ws")
@@ -234,8 +239,17 @@ function setNick(){
 
 function handleWS(e){
     const d = JSON.parse(e.data);
+
     if(d.type === "message"){
         addMessage(d.nick, d.text, d.nick === myNick ? "me" : "other");
+    }
+
+    if(d.type === "system"){
+        addSystem(d.text);
+    }
+
+    if(d.type === "users"){
+        updateUsers(d.users);
     }
 }
 
@@ -246,7 +260,6 @@ function sendMessage(){
     }
 }
 
-/* ✅ ЕДИНСТВЕННОЕ ИСПРАВЛЕНИЕ — ЧТОБ ТЕКСТ ПЕЧАТАЛСЯ */
 messageInput.addEventListener("keydown", e => {
     if (e.key === "Enter") {
         e.preventDefault();
@@ -265,6 +278,23 @@ function addMessage(nick, text, side){
     chat.scrollTop = chat.scrollHeight;
 }
 
+function addSystem(text){
+    const s = document.createElement("div");
+    s.className = "system";
+    s.textContent = text;
+    chat.appendChild(s);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function updateUsers(users){
+    userList.innerHTML = "";
+    users.forEach(u=>{
+        const li = document.createElement("li");
+        li.textContent = "🟢 " + u;
+        userList.appendChild(li);
+    });
+}
+
 function toggleEmoji(){
     emojiPanel.style.display =
         emojiPanel.style.display === "block" ? "none" : "block";
@@ -276,6 +306,16 @@ emojis.forEach(e=>{
     s.onclick = () => messageInput.value += e;
     emojiPanel.appendChild(s);
 });
+
+window.onload = () => {
+    const p = localStorage.getItem("auth_phone");
+    const pass = localStorage.getItem("auth_pass");
+    if(p && pass){
+        phoneInput.value = p;
+        passwordInput.value = pass;
+        login();
+    }
+};
 </script>
 
 </body>
