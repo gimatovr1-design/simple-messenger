@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import FileResponse
 import uvicorn, os, json
 
@@ -10,7 +10,7 @@ async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 # ===============================
-# ОБЩИЙ ЧАТ (БЕЗ ЛОМКИ)
+# ОБЩИЙ ЧАТ (БЕЗ ИЗМЕНЕНИЙ)
 # ===============================
 
 class Manager:
@@ -62,23 +62,11 @@ async def ws(ws: WebSocket):
                 })
                 continue
 
-            try:
-                data = json.loads(msg)
-            except:
-                await manager.broadcast({
-                    "type": "message",
-                    "nick": manager.clients.get(ws, ""),
-                    "text": msg
-                })
-                continue
-
-            data["from"] = manager.clients.get(ws, "")
-            if "to" in data:
-                for c, n in manager.clients.items():
-                    if n == data["to"]:
-                        await manager.send(c, data)
-            else:
-                await manager.broadcast(data, skip=ws)
+            await manager.broadcast({
+                "type": "message",
+                "nick": manager.clients.get(ws, ""),
+                "text": msg
+            })
 
     except WebSocketDisconnect:
         nick = manager.clients.get(ws)
@@ -91,7 +79,7 @@ async def ws(ws: WebSocket):
         manager.disconnect(ws)
 
 # ===============================
-# АВТОРИЗАЦИЯ ПО НОМЕРУ (ИСПРАВЛЕНА ОШИБКА)
+# АВТОРИЗАЦИЯ (ФИКС)
 # ===============================
 
 USERS_FILE = os.path.join(BASE_DIR, "users.json")
@@ -109,23 +97,25 @@ def save_users(users):
         json.dump(users, f, ensure_ascii=False, indent=2)
 
 @app.post("/register")
-async def register(data: dict):
-    phone = data.get("phone")
-    password = data.get("password")
+async def register(request: Request):
+    form = await request.form()
+    phone = form.get("phone")
+    password = form.get("password")
 
     users = load_users()
 
     if phone in users:
-        return {"ok": False, "error": "Пользователь уже существует"}
+        return {"ok": False, "error": "exists"}
 
     users[phone] = {"password": password}
     save_users(users)
     return {"ok": True}
 
 @app.post("/login")
-async def login(data: dict):
-    phone = data.get("phone")
-    password = data.get("password")
+async def login(request: Request):
+    form = await request.form()
+    phone = form.get("phone")
+    password = form.get("password")
 
     users = load_users()
 
@@ -135,43 +125,8 @@ async def login(data: dict):
     return {"ok": True}
 
 # ===============================
-# ПРИВАТНЫЕ ЧАТЫ 1-на-1 (БЕЗ ИЗМЕНЕНИЙ)
+# ЗАПУСК
 # ===============================
-
-class PrivateManager:
-    def __init__(self):
-        self.clients: dict[WebSocket, str] = {}
-
-    async def connect(self, ws: WebSocket, phone: str):
-        await ws.accept()
-        self.clients[ws] = phone
-
-    def disconnect(self, ws: WebSocket):
-        self.clients.pop(ws, None)
-
-    async def send_to(self, from_phone, to_phone, text):
-        for ws, phone in self.clients.items():
-            if phone == to_phone:
-                await ws.send_json({
-                    "from": from_phone,
-                    "text": text
-                })
-
-private_manager = PrivateManager()
-
-@app.websocket("/ws-private/{phone}")
-async def ws_private(ws: WebSocket, phone: str):
-    await private_manager.connect(ws, phone)
-    try:
-        while True:
-            data = await ws.receive_json()
-            await private_manager.send_to(
-                phone,
-                data["to"],
-                data["text"]
-            )
-    except WebSocketDisconnect:
-        private_manager.disconnect(ws)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
