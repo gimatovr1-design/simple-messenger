@@ -54,7 +54,8 @@ async function register(){
 
     const data = await res.json();
 
-    if(data.ok){
+    // ✅ ИСПРАВЛЕНИЕ ЗДЕСЬ
+    if (data.status === "ok") {
         alert("✅ Регистрация успешна");
         window.location.href = "/login";
     } else {
