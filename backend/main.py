@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response
 from fastapi.responses import FileResponse
 import uvicorn
@@ -19,7 +18,7 @@ async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 # ===============================
-# ЧАТ (СТАБИЛЬНЫЙ, НЕ ТРОГАЕМ)
+# ЧАТ (СТАБИЛЬНЫЙ)
 # ===============================
 
 class Manager:
@@ -40,6 +39,9 @@ class Manager:
             except:
                 self.disconnect(c)
 
+    def get_online_list(self):
+        return [nick for nick in self.clients.values() if nick]
+
 manager = Manager()
 
 @app.websocket("/ws")
@@ -52,8 +54,22 @@ async def websocket(ws: WebSocket):
             if msg.startswith("/nick "):
                 nick = msg[6:]
                 manager.clients[ws] = nick
-                await ws.send_json({"type": "system", "text": "✅ Ник установлен"})
-                await manager.broadcast({"type": "status", "nick": nick, "online": True})
+
+                await ws.send_json({
+                    "type": "system",
+                    "text": "✅ Ник установлен"
+                })
+
+                await manager.broadcast({
+                    "type": "status",
+                    "nick": nick,
+                    "online": True
+                })
+
+                await manager.broadcast({
+                    "type": "users",
+                    "list": manager.get_online_list()
+                })
                 continue
 
             await manager.broadcast({
@@ -65,11 +81,21 @@ async def websocket(ws: WebSocket):
     except WebSocketDisconnect:
         nick = manager.clients.get(ws)
         if nick:
-            await manager.broadcast({"type": "status", "nick": nick, "online": False})
+            await manager.broadcast({
+                "type": "status",
+                "nick": nick,
+                "online": False
+            })
+
+            await manager.broadcast({
+                "type": "users",
+                "list": manager.get_online_list()
+            })
+
         manager.disconnect(ws)
 
 # ===============================
-# АВТОРИЗАЦИЯ (РАБОЧАЯ)
+# АВТОРИЗАЦИЯ
 # ===============================
 
 USERS_FILE = os.path.join(BASE_DIR, "users.json")
