@@ -1,6 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response, Request
 from fastapi.responses import FileResponse, RedirectResponse
-import uvicorn, os, json, uuid
+import uvicorn, os, json, uuid, hashlib
 
 app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -74,7 +74,7 @@ async def ws(ws: WebSocket):
         manager.disconnect(ws)
 
 # ===============================
-# АВТОРИЗАЦИЯ (ВЕЧНАЯ)
+# АВТОРИЗАЦИЯ (РАБОЧАЯ)
 # ===============================
 
 USERS_FILE = os.path.join(BASE_DIR, "users.json")
@@ -89,19 +89,27 @@ def save_users(users):
     with open(USERS_FILE, "w") as f:
         json.dump(users, f)
 
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
 @app.post("/register")
 async def register(data: dict = Body(...)):
     phone = data.get("phone")
     password = data.get("password")
 
+    if not phone or not password:
+        return {"ok": False, "error": "empty"}
+
     users = load_users()
+
     if phone in users:
-        return {"ok": False}
+        return {"ok": False, "error": "exists"}
 
     users[phone] = {
-        "password": password,
+        "password": hash_password(password),
         "token": str(uuid.uuid4())
     }
+
     save_users(users)
     return {"ok": True}
 
@@ -111,18 +119,20 @@ async def login(data: dict = Body(...), response: Response = Response()):
     password = data.get("password")
 
     users = load_users()
+
     if phone not in users:
         return {"ok": False}
 
-    if users[phone]["password"] != password:
+    if users[phone]["password"] != hash_password(password):
         return {"ok": False}
 
     response.set_cookie(
         key="token",
         value=users[phone]["token"],
         httponly=True,
-        max_age=60 * 60 * 24 * 365  # 1 год
+        max_age=60 * 60 * 24 * 365
     )
+
     return {"ok": True}
 
 # ===============================
@@ -131,3 +141,4 @@ async def login(data: dict = Body(...), response: Response = Response()):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
