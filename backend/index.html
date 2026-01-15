@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
+/* === СТИЛИ БЕЗ ИЗМЕНЕНИЙ === */
 body {
     margin: 0;
     padding: 10px;
@@ -151,20 +152,8 @@ input, button {
 </div>
 
 <script>
-const authTitle = document.getElementById("authTitle");
-const phoneInput = document.getElementById("phoneInput");
-const passwordInput = document.getElementById("passwordInput");
-const loginBox = document.getElementById("loginBox");
-const chatApp = document.getElementById("chatApp");
-const nickBox = document.getElementById("nickBox");
-const nickInput = document.getElementById("nickInput");
-const messageInput = document.getElementById("messageInput");
-const emojiPanel = document.getElementById("emojiPanel");
-const chat = document.getElementById("chat");
-const userList = document.getElementById("userList");
-
-let myNick = "";
 let ws = null;
+let myNick = "";
 let authMode = "login";
 
 const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤ 💔 💖 💕 💯 🔥 🎉".split(" ");
@@ -183,6 +172,7 @@ function authSubmit(){
 function login(){
     fetch("/login", {
         method:"POST",
+        credentials: "include",
         headers:{ "Content-Type":"application/json" },
         body: JSON.stringify({
             phone: phoneInput.value.trim(),
@@ -195,25 +185,14 @@ function login(){
             alert("Ошибка входа ❌");
             return;
         }
-
-        localStorage.setItem("auth_phone", phoneInput.value.trim());
-        localStorage.setItem("auth_pass", passwordInput.value.trim());
-
-        ws = new WebSocket(
-            (location.protocol==="https:"?"wss":"ws")
-            + "://" + location.host + "/ws"
-        );
-        ws.onmessage = handleWS;
-
-        loginBox.style.display="none";
-        chatApp.style.display="block";
-        nickBox.style.display="block";
+        startApp();
     });
 }
 
 function register(){
     fetch("/register", {
         method:"POST",
+        credentials: "include",
         headers:{ "Content-Type":"application/json" },
         body: JSON.stringify({
             phone: phoneInput.value.trim(),
@@ -226,9 +205,21 @@ function register(){
             alert("Ошибка регистрации ❌");
             return;
         }
-        alert("✅ Успешно зарегистрирован");
         toggleAuth();
+        alert("✅ Успешно зарегистрирован");
     });
+}
+
+function startApp(){
+    ws = new WebSocket(
+        (location.protocol==="https:"?"wss":"ws")
+        + "://" + location.host + "/ws"
+    );
+    ws.onmessage = handleWS;
+
+    loginBox.style.display="none";
+    chatApp.style.display="block";
+    nickBox.style.display="block";
 }
 
 function setNick(){
@@ -243,13 +234,11 @@ function handleWS(e){
     if(d.type === "message"){
         addMessage(d.nick, d.text, d.nick === myNick ? "me" : "other");
     }
-
     if(d.type === "system"){
         addSystem(d.text);
     }
-
     if(d.type === "users"){
-        updateUsers(d.users);   // 🔥 фикс онлайн
+        updateUsers(d.users);
     }
 }
 
@@ -259,13 +248,6 @@ function sendMessage(){
         messageInput.value = "";
     }
 }
-
-messageInput.addEventListener("keydown", e => {
-    if (e.key === "Enter") {
-        e.preventDefault();
-        sendMessage();
-    }
-});
 
 function addMessage(nick, text, side){
     const m = document.createElement("div");
@@ -308,13 +290,11 @@ emojis.forEach(e=>{
 });
 
 window.onload = () => {
-    const p = localStorage.getItem("auth_phone");
-    const pass = localStorage.getItem("auth_pass");
-    if(p && pass){
-        phoneInput.value = p;
-        passwordInput.value = pass;
-        login();
-    }
+    fetch("/me", { credentials: "include" })
+        .then(r=>r.json())
+        .then(d=>{
+            if(d.auth) startApp();
+        });
 };
 </script>
 
