@@ -122,7 +122,7 @@ async def register(data: dict = Body(...)):
     return {"ok": True}
 
 @app.post("/login")
-async def login(data: dict = Body(...), response: Response):
+async def login(response: Response, data: dict = Body(...)):
     phone = data.get("phone")
     password = data.get("password")
 
