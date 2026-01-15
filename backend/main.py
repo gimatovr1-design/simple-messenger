@@ -1,5 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 import uvicorn
 import os
 import uuid
@@ -25,6 +25,14 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 🔥 ВОТ ЭТО ДОБАВЛЕНО (ЕДИНСТВЕННОЕ ИСПРАВЛЕНИЕ)
+@app.exception_handler(Exception)
+async def all_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"ok": False, "error": str(exc)}
+    )
 
 @app.get("/")
 async def root():
