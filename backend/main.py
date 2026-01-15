@@ -1,10 +1,27 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response, Request
 from fastapi.responses import FileResponse
 import uvicorn
 import os
-import json
 import uuid
 import hashlib
+
+from dotenv import load_dotenv
+from supabase import create_client
+
+# ===============================
+# ENV + SUPABASE
+# ===============================
+
+load_dotenv()
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# ===============================
+# APP
+# ===============================
 
 app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -14,7 +31,7 @@ async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 # ===============================
-# ЧАТ
+# ЧАТ (НЕ ТРОГАЕМ)
 # ===============================
 
 class Manager:
@@ -57,14 +74,8 @@ async def websocket(ws: WebSocket):
                 })
 
                 await manager.broadcast({
-                    "type": "status",
-                    "nick": nick,
-                    "online": True
-                })
-
-                await manager.broadcast({
                     "type": "users",
-                    "users": manager.get_online_list()   # 🔥 ВАЖНО
+                    "users": manager.get_online_list()
                 })
                 continue
 
@@ -78,36 +89,15 @@ async def websocket(ws: WebSocket):
         nick = manager.clients.get(ws)
         if nick:
             await manager.broadcast({
-                "type": "status",
-                "nick": nick,
-                "online": False
-            })
-
-            await manager.broadcast({
                 "type": "users",
-                "users": manager.get_online_list()   # 🔥 ВАЖНО
+                "users": manager.get_online_list()
             })
 
         manager.disconnect(ws)
 
 # ===============================
-# АВТОРИЗАЦИЯ
+# АВТОРИЗАЦИЯ (SUPABASE)
 # ===============================
-
-USERS_FILE = os.path.join(BASE_DIR, "users.json")
-
-def load_users():
-    if not os.path.exists(USERS_FILE):
-        return {}
-    try:
-        with open(USERS_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return {}
-
-def save_users(users):
-    with open(USERS_FILE, "w") as f:
-        json.dump(users, f)
 
 def hash_password(p: str) -> str:
     return hashlib.sha256(p.encode()).hexdigest()
@@ -120,42 +110,68 @@ async def register(data: dict = Body(...)):
     if not phone or not password:
         return {"status": "error"}
 
-    users = load_users()
-    if phone in users:
+    exists = supabase.table("users").select("id").eq("phone", phone).execute()
+    if exists.data:
         return {"status": "error"}
 
-    users[phone] = {
-        "password": hash_password(password),
-        "token": str(uuid.uuid4())
-    }
+    token = str(uuid.uuid4())
 
-    save_users(users)
+    supabase.table("users").insert({
+        "phone": phone,
+        "password_hash": hash_password(password),
+        "token": token
+    }).execute()
+
     return {"status": "ok"}
 
 @app.post("/login")
-async def login(data: dict = Body(...), response: Response = None):
+async def login(
+    data: dict = Body(...),
+    response: Response = None
+):
     phone = data.get("phone")
     password = data.get("password")
 
     if not phone or not password:
         return {"status": "error"}
 
-    users = load_users()
-    if phone not in users:
+    res = supabase.table("users") \
+        .select("token, password_hash") \
+        .eq("phone", phone) \
+        .execute()
+
+    if not res.data:
         return {"status": "error"}
 
-    if users[phone]["password"] != hash_password(password):
+    user = res.data[0]
+    if user["password_hash"] != hash_password(password):
         return {"status": "error"}
 
     response.set_cookie(
         key="token",
-        value=users[phone]["token"],
+        value=user["token"],
         httponly=True,
         samesite="lax",
         max_age=60 * 60 * 24 * 365
     )
 
     return {"status": "ok"}
+
+@app.get("/me")
+async def me(request: Request):
+    token = request.cookies.get("token")
+    if not token:
+        return {"auth": False}
+
+    res = supabase.table("users").select("phone").eq("token", token).execute()
+    if not res.data:
+        return {"auth": False}
+
+    return {"auth": True, "phone": res.data[0]["phone"]}
+
+# ===============================
+# RUN
+# ===============================
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
