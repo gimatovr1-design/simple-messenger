@@ -1,5 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Response, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 import uvicorn
 import os
 import uuid
@@ -105,29 +105,31 @@ async def register(data: dict = Body(...)):
     password = data.get("password")
 
     if not phone or not password:
-        return JSONResponse({"ok": False})
+        return {"ok": False}
 
     exists = supabase.table("users").select("id").eq("phone", phone).execute()
     if exists.data:
-        return JSONResponse({"ok": False})
+        return {"ok": False}
 
     token = str(uuid.uuid4())
 
+    # ✅ ВОТ ЕДИНСТВЕННОЕ ИСПРАВЛЕНИЕ
     supabase.table("users").insert({
         "phone": phone,
         "password_hash": hash_password(password),
-        "token": token
+        "token": token,
+        "nickname": phone   # 👈 было НЕТ → теперь ЕСТЬ
     }).execute()
 
-    return JSONResponse({"ok": True})
+    return {"ok": True}
 
 @app.post("/login")
-async def login(data: dict = Body(...), response: Response = Response()):
+async def login(response: Response, data: dict = Body(...)):
     phone = data.get("phone")
     password = data.get("password")
 
     if not phone or not password:
-        return JSONResponse({"ok": False})
+        return {"ok": False}
 
     res = supabase.table("users") \
         .select("token, password_hash") \
@@ -135,11 +137,11 @@ async def login(data: dict = Body(...), response: Response = Response()):
         .execute()
 
     if not res.data:
-        return JSONResponse({"ok": False})
+        return {"ok": False}
 
     user = res.data[0]
     if user["password_hash"] != hash_password(password):
-        return JSONResponse({"ok": False})
+        return {"ok": False}
 
     response.set_cookie(
         key="token",
@@ -149,19 +151,19 @@ async def login(data: dict = Body(...), response: Response = Response()):
         max_age=60 * 60 * 24 * 365
     )
 
-    return JSONResponse({"ok": True})
+    return {"ok": True}
 
 @app.get("/me")
 async def me(request: Request):
     token = request.cookies.get("token")
     if not token:
-        return JSONResponse({"auth": False})
+        return {"auth": False}
 
     res = supabase.table("users").select("phone").eq("token", token).execute()
     if not res.data:
-        return JSONResponse({"auth": False})
+        return {"auth": False}
 
-    return JSONResponse({"auth": True, "phone": res.data[0]["phone"]})
+    return {"auth": True, "phone": res.data[0]["phone"]}
 
 # ===============================
 # RUN
