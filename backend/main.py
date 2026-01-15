@@ -101,8 +101,8 @@ def hash_password(p: str) -> str:
 
 @app.post("/register")
 async def register(data: dict = Body(...)):
-    phone = data.get("phone", "").strip()
-    password = data.get("password", "").strip()
+    phone = data.get("phone")
+    password = data.get("password")
 
     if not phone or not password:
         return {"ok": False}
@@ -124,14 +124,14 @@ async def register(data: dict = Body(...)):
 
 @app.post("/login")
 async def login(response: Response, data: dict = Body(...)):
-    phone = data.get("phone", "").strip()
-    password = data.get("password", "").strip()
+    phone = data.get("phone")
+    password = data.get("password")
 
     if not phone or not password:
         return {"ok": False}
 
     res = supabase.table("users") \
-        .select("token, password_hash, nickname") \
+        .select("token, password_hash") \
         .eq("phone", phone) \
         .execute()
 
@@ -139,7 +139,6 @@ async def login(response: Response, data: dict = Body(...)):
         return {"ok": False}
 
     user = res.data[0]
-
     if user["password_hash"] != hash_password(password):
         return {"ok": False}
 
@@ -151,10 +150,12 @@ async def login(response: Response, data: dict = Body(...)):
         max_age=60 * 60 * 24 * 365
     )
 
-    return {
-        "ok": True,
-        "nickname": user["nickname"]
-    }
+    return {"ok": True}
+
+@app.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie("token")
+    return {"ok": True}
 
 @app.get("/me")
 async def me(request: Request):
@@ -162,21 +163,11 @@ async def me(request: Request):
     if not token:
         return {"auth": False}
 
-    res = supabase.table("users") \
-        .select("phone, nickname") \
-        .eq("token", token) \
-        .execute()
-
+    res = supabase.table("users").select("phone").eq("token", token).execute()
     if not res.data:
         return {"auth": False}
 
-    user = res.data[0]
-
-    return {
-        "auth": True,
-        "nickname": user["nickname"],
-        "phone": user["phone"]
-    }
+    return {"auth": True, "phone": res.data[0]["phone"]}
 
 # ===============================
 # RUN

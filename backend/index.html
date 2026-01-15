@@ -135,6 +135,7 @@ input, button {
     <div id="users">
         <b>Онлайн</b>
         <ul id="userList"></ul>
+        <button onclick="logout()">🚪 Выйти</button>
     </div>
 
     <div class="chatBox">
@@ -181,7 +182,7 @@ function login(){
     })
     .then(r=>r.json())
     .then(d=>{
-        if(d.status !== "ok"){
+        if(!d.ok){
             alert("Ошибка входа ❌");
             return;
         }
@@ -201,7 +202,7 @@ function register(){
     })
     .then(r=>r.json())
     .then(d=>{
-        if(d.status !== "ok"){
+        if(!d.ok){
             alert("Ошибка регистрации ❌");
             return;
         }
@@ -247,6 +248,19 @@ function sendMessage(){
         ws.send(messageInput.value);
         messageInput.value = "";
     }
+}
+
+/* ⏎ ОТПРАВКА ПО ENTER */
+messageInput.addEventListener("keydown", e=>{
+    if(e.key === "Enter"){
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+function logout(){
+    fetch("/logout", { method:"POST", credentials:"include" })
+        .then(()=>location.reload());
 }
 
 function addMessage(nick, text, side){
