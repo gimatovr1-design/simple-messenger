@@ -86,14 +86,11 @@ async def websocket(ws: WebSocket):
             })
 
     except WebSocketDisconnect:
-        nick = manager.clients.get(ws)
-        if nick:
-            await manager.broadcast({
-                "type": "users",
-                "users": manager.get_online_list()
-            })
-
         manager.disconnect(ws)
+        await manager.broadcast({
+            "type": "users",
+            "users": manager.get_online_list()
+        })
 
 # ===============================
 # АВТОРИЗАЦИЯ (SUPABASE)
@@ -127,7 +124,7 @@ async def register(data: dict = Body(...)):
 @app.post("/login")
 async def login(
     data: dict = Body(...),
-    response: Response = None
+    response: Response = Response()
 ):
     phone = data.get("phone")
     password = data.get("password")
