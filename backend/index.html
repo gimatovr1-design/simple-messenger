@@ -15,119 +15,23 @@ body {
     background: linear-gradient(120deg,#7f00ff,#00c6ff,#ff0080);
     font-size: clamp(14px, 2.5vw, 16px);
 }
-
-#loginBox,#nickBox,#chatApp {
-    max-width: 1000px;
-    margin: auto;
-}
-
-#loginBox {
-    max-width: 320px;
-    background: rgba(0,0,0,.45);
-    padding: 20px;
-    border-radius: 12px;
-}
-
-.layout {
-    display: flex;
-    gap: 10px;
-}
-
-#users {
-    width: 180px;
-    background: rgba(0,0,0,.45);
-    padding: 8px;
-    border-radius: 8px;
-}
-
-.chatBox {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-#chat {
-    flex: 1;
-    min-height: 300px;
-    overflow-y: auto;
-    background: rgba(0,0,0,.45);
-    border-radius: 8px;
-    padding: 10px;
-}
-
-.msg {
-    display: flex;
-    margin-bottom: 8px;
-}
-
-.msg.me { flex-direction: row-reverse; }
-
-.avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgba(255,255,255,.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 6px;
-    font-weight: bold;
-}
-
-.bubble {
-    max-width: 65%;
-    padding: 6px 10px;
-    border-radius: 10px;
-    background: rgba(0,255,255,.35);
-    word-break: break-word;
-}
-
-.msg.other .bubble {
-    background: rgba(255,0,255,.35);
-}
-
-.system {
-    text-align: center;
-    font-size: 13px;
-    opacity: .8;
-    margin: 6px 0;
-}
-
-.inputBox {
-    display: flex;
-    gap: 6px;
-    margin-top: 6px;
-}
-
-input,button {
-    width: 100%;
-    padding: 10px;
-    margin-top: 6px;
-    font-size: 16px;
-}
-
-#emojiPanel {
-    display: none;
-    background: rgba(0,0,0,.5);
-    padding: 6px;
-    border-radius: 8px;
-    margin-top: 6px;
-    max-height: 120px;
-    overflow-y: auto;
-}
-
-#emojiPanel span {
-    cursor: pointer;
-    font-size: 20px;
-    padding: 4px;
-    display: inline-block;
-}
-
-@media (max-width:768px){
-    .layout{flex-direction:column}
-    #users{width:100%}
-    .bubble{max-width:85%}
-}
+#loginBox,#nickBox,#chatApp{max-width:1000px;margin:auto}
+#loginBox{max-width:320px;background:rgba(0,0,0,.45);padding:20px;border-radius:12px}
+.layout{display:flex;gap:10px}
+#users{width:180px;background:rgba(0,0,0,.45);padding:8px;border-radius:8px}
+.chatBox{flex:1;display:flex;flex-direction:column}
+#chat{flex:1;min-height:300px;overflow-y:auto;background:rgba(0,0,0,.45);border-radius:8px;padding:10px}
+.msg{display:flex;margin-bottom:8px}
+.msg.me{flex-direction:row-reverse}
+.avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;margin:0 6px;font-weight:bold}
+.bubble{max-width:65%;padding:6px 10px;border-radius:10px;background:rgba(0,255,255,.35);word-break:break-word}
+.msg.other .bubble{background:rgba(255,0,255,.35)}
+.system{text-align:center;font-size:13px;opacity:.8;margin:6px 0}
+.inputBox{display:flex;gap:6px;margin-top:6px}
+input,button{width:100%;padding:10px;margin-top:6px;font-size:16px}
+#emojiPanel{display:none;background:rgba(0,0,0,.5);padding:6px;border-radius:8px;margin-top:6px;max-height:120px;overflow-y:auto}
+#emojiPanel span{cursor:pointer;font-size:20px;padding:4px;display:inline-block}
+@media(max-width:768px){.layout{flex-direction:column}#users{width:100%}.bubble{max-width:85%}}
 </style>
 </head>
 
@@ -154,8 +58,6 @@ input,button {
     <div id="users">
         <b>Онлайн</b>
         <ul id="userList"></ul>
-
-        <!-- 🗑 КНОПКА ТОЛЬКО ДЛЯ ТЕБЯ -->
         <button onclick="clearChat()">🗑 Очистить чат</button>
         <button onclick="logout()">🚪 Выйти</button>
     </div>
@@ -175,21 +77,24 @@ input,button {
 </div>
 
 <script>
-let ws=null,myNick="",authMode="login";
+let ws = null;
+let myNick = "";
+let authMode = "login";
 
 const emojis="😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😎 😍 😘 🤔 😐 🙄 😴 😡 😭 😱 👍 👎 👏 🙌 💪 ❤ 💔 🔥 🎉".split(" ");
 
 function toggleAuth(){
-    authMode=authMode==="login"?"register":"login";
-    authTitle.innerText=authMode==="login"?"Вход 🔐":"Регистрация 📱";
+    authMode = authMode==="login"?"register":"login";
+    authTitle.innerText = authMode==="login"?"Вход 🔐":"Регистрация 📱";
 }
 
 function authSubmit(){ authMode==="login"?login():register(); }
 
 function login(){
-fetch("/login",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},
+fetch("/login",{method:"POST",credentials:"include",
+headers:{"Content-Type":"application/json"},
 body:JSON.stringify({phone:phoneInput.value,password:passwordInput.value})})
-.then(r=>r.json()).then(d=>{if(d.ok)startApp();});
+.then(r=>r.json()).then(d=>{ if(d.ok) startApp(); });
 }
 
 function register(){
@@ -199,56 +104,76 @@ body:JSON.stringify({phone:phoneInput.value,password:passwordInput.value})})
 }
 
 function startApp(){
-ws=new WebSocket((location.protocol==="https:"?"wss":"ws")+"://"+location.host+"/ws");
-ws.onmessage=e=>handleWS(e);
+ws = new WebSocket((location.protocol==="https:"?"wss":"ws")+"://"+location.host+"/ws");
+
+ws.onmessage = e=>{
+    const d = JSON.parse(e.data);
+
+    if(d.type==="message"){
+        addMessage(d.nick,d.text,d.nick===myNick?"me":"other");
+    }
+    if(d.type==="system"){
+        addSystem(d.text);
+    }
+    if(d.type==="users"){
+        updateUsers(d.users);
+    }
+};
+
 loginBox.style.display="none";
 chatApp.style.display="block";
 nickBox.style.display="block";
 }
 
 function setNick(){
-myNick=nickInput.value;
-ws.send("/nick "+myNick);
-nickBox.style.display="none";
+myNick = nickInput.value.trim();
+if(myNick){
+    ws.send("/nick "+myNick);
+    nickBox.style.display="none";
 }
-
-function handleWS(e){
-const d=JSON.parse(e.data);
-if(d.type==="message")addMessage(d.nick,d.text,d.nick===myNick?"me":"other");
-if(d.type==="system")addSystem(d.text);
-if(d.type==="users")updateUsers(d.users);
 }
 
 function sendMessage(){
 if(messageInput.value.trim()){
-ws.send(messageInput.value);
-messageInput.value="";
+    ws.send(messageInput.value);
+    messageInput.value="";
 }}
 
 function clearChat(){
-fetch("/clear",{method:"POST"}).then(()=>{
-chat.innerHTML="";
+fetch("/clear",{method:"POST",credentials:"include"}).then(()=>{
+    chat.innerHTML="";
 });
 }
 
-function logout(){fetch("/logout",{method:"POST"}).then(()=>location.reload());}
+function logout(){
+fetch("/logout",{method:"POST",credentials:"include"})
+.then(()=>location.reload());
+}
 
 function addMessage(n,t,s){
 const m=document.createElement("div");
 m.className="msg "+s;
-m.innerHTML=`<div class="avatar">${n[0]}</div><div class="bubble"><b>${n}</b><br>${t}</div>`;
-chat.appendChild(m);chat.scrollTop=chat.scrollHeight;
+m.innerHTML=`<div class="avatar">${n[0]}</div>
+<div class="bubble"><b>${n}</b><br>${t}</div>`;
+chat.appendChild(m);
+chat.scrollTop=chat.scrollHeight;
 }
 
 function addSystem(t){
 const s=document.createElement("div");
-s.className="system";s.textContent=t;
+s.className="system";
+s.textContent=t;
 chat.appendChild(s);
+chat.scrollTop=chat.scrollHeight;
 }
 
 function updateUsers(u){
 userList.innerHTML="";
-u.forEach(n=>{const li=document.createElement("li");li.textContent="🟢 "+n;userList.appendChild(li);});
+u.forEach(n=>{
+    const li=document.createElement("li");
+    li.textContent="🟢 "+n;
+    userList.appendChild(li);
+});
 }
 
 function toggleEmoji(){
