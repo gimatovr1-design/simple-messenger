@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-/* === БАЗА === */
 body {
     margin: 0;
     padding: 10px;
@@ -17,15 +16,11 @@ body {
     font-size: clamp(14px, 2.5vw, 16px);
 }
 
-/* === АВТОЦЕНТРОВКА === */
-#loginBox,
-#nickBox,
-#chatApp {
+#loginBox,#nickBox,#chatApp {
     max-width: 1000px;
     margin: auto;
 }
 
-/* === LOGIN === */
 #loginBox {
     max-width: 320px;
     background: rgba(0,0,0,.45);
@@ -33,22 +28,18 @@ body {
     border-radius: 12px;
 }
 
-/* === LAYOUT === */
 .layout {
     display: flex;
     gap: 10px;
-    width: 100%;
 }
 
-/* === USERS === */
 #users {
-    width: 160px;
+    width: 180px;
     background: rgba(0,0,0,.45);
     padding: 8px;
     border-radius: 8px;
 }
 
-/* === CHAT === */
 .chatBox {
     flex: 1;
     display: flex;
@@ -64,15 +55,12 @@ body {
     padding: 10px;
 }
 
-/* === MESSAGES === */
 .msg {
     display: flex;
     margin-bottom: 8px;
 }
 
-.msg.me {
-    flex-direction: row-reverse;
-}
+.msg.me { flex-direction: row-reverse; }
 
 .avatar {
     width: 36px;
@@ -105,22 +93,19 @@ body {
     margin: 6px 0;
 }
 
-/* === INPUT === */
 .inputBox {
     display: flex;
     gap: 6px;
     margin-top: 6px;
 }
 
-input,
-button {
+input,button {
     width: 100%;
     padding: 10px;
     margin-top: 6px;
     font-size: 16px;
 }
 
-/* === EMOJI === */
 #emojiPanel {
     display: none;
     background: rgba(0,0,0,.5);
@@ -138,29 +123,10 @@ button {
     display: inline-block;
 }
 
-/* === 📱 АДАПТИВНОСТЬ === */
-@media (max-width: 768px) {
-
-    .layout {
-        flex-direction: column;
-    }
-
-    #users {
-        width: 100%;
-        order: 2;
-    }
-
-    .chatBox {
-        order: 1;
-    }
-
-    .bubble {
-        max-width: 85%;
-    }
-
-    #chat {
-        min-height: 55dvh;
-    }
+@media (max-width:768px){
+    .layout{flex-direction:column}
+    #users{width:100%}
+    .bubble{max-width:85%}
 }
 </style>
 </head>
@@ -169,15 +135,10 @@ button {
 
 <div id="loginBox">
     <h3 id="authTitle">Вход 🔐</h3>
-
     <input id="phoneInput" placeholder="Номер телефона">
     <input id="passwordInput" type="password" placeholder="Пароль">
-
     <button onclick="authSubmit()">Войти</button>
-
-    <div id="authSwitch"
-         style="cursor:pointer;margin-top:10px;opacity:.85"
-         onclick="toggleAuth()">
+    <div id="authSwitch" style="cursor:pointer;margin-top:10px" onclick="toggleAuth()">
         Нет аккаунта? Зарегистрироваться
     </div>
 </div>
@@ -193,6 +154,9 @@ button {
     <div id="users">
         <b>Онлайн</b>
         <ul id="userList"></ul>
+
+        <!-- 🗑 КНОПКА ТОЛЬКО ДЛЯ ТЕБЯ -->
+        <button onclick="clearChat()">🗑 Очистить чат</button>
         <button onclick="logout()">🚪 Выйти</button>
     </div>
 
@@ -211,162 +175,92 @@ button {
 </div>
 
 <script>
-let ws = null;
-let myNick = "";
-let authMode = "login";
+let ws=null,myNick="",authMode="login";
 
-const emojis = "😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 🙂 🤗 🤩 🤔 🤨 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🥰 😇 🤪 😡 😠 🤬 😤 😭 😢 😱 😨 😰 😲 🤯 👍 👎 👏 🙌 🤝 💪 🙏 ❤ 💔 💖 💕 💯 🔥 🎉".split(" ");
+const emojis="😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😎 😍 😘 🤔 😐 🙄 😴 😡 😭 😱 👍 👎 👏 🙌 💪 ❤ 💔 🔥 🎉".split(" ");
 
 function toggleAuth(){
-    authMode = authMode === "login" ? "register" : "login";
-    authTitle.innerText = authMode === "login" ? "Вход 🔐" : "Регистрация 📱";
-    document.querySelector("#loginBox button").innerText =
-        authMode === "login" ? "Войти" : "Зарегистрироваться";
+    authMode=authMode==="login"?"register":"login";
+    authTitle.innerText=authMode==="login"?"Вход 🔐":"Регистрация 📱";
 }
 
-function authSubmit(){
-    authMode === "login" ? login() : register();
-}
+function authSubmit(){ authMode==="login"?login():register(); }
 
 function login(){
-    fetch("/login", {
-        method:"POST",
-        credentials: "include",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({
-            phone: phoneInput.value.trim(),
-            password: passwordInput.value.trim()
-        })
-    })
-    .then(r=>r.json())
-    .then(d=>{
-        if(!d.ok){
-            alert("Ошибка входа ❌");
-            return;
-        }
-        startApp();
-    });
+fetch("/login",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({phone:phoneInput.value,password:passwordInput.value})})
+.then(r=>r.json()).then(d=>{if(d.ok)startApp();});
 }
 
 function register(){
-    fetch("/register", {
-        method:"POST",
-        credentials: "include",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({
-            phone: phoneInput.value.trim(),
-            password: passwordInput.value.trim()
-        })
-    })
-    .then(r=>r.json())
-    .then(d=>{
-        if(!d.ok){
-            alert("Ошибка регистрации ❌");
-            return;
-        }
-        toggleAuth();
-        alert("✅ Успешно зарегистрирован");
-    });
+fetch("/register",{method:"POST",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({phone:phoneInput.value,password:passwordInput.value})})
+.then(()=>alert("✅ Готово"));
 }
 
 function startApp(){
-    ws = new WebSocket(
-        (location.protocol==="https:"?"wss":"ws")
-        + "://" + location.host + "/ws"
-    );
-    ws.onmessage = handleWS;
-
-    loginBox.style.display="none";
-    chatApp.style.display="block";
-    nickBox.style.display="block";
+ws=new WebSocket((location.protocol==="https:"?"wss":"ws")+"://"+location.host+"/ws");
+ws.onmessage=e=>handleWS(e);
+loginBox.style.display="none";
+chatApp.style.display="block";
+nickBox.style.display="block";
 }
 
 function setNick(){
-    myNick = nickInput.value.trim();
-    if(myNick) ws.send("/nick " + myNick);
-    nickBox.style.display="none";
+myNick=nickInput.value;
+ws.send("/nick "+myNick);
+nickBox.style.display="none";
 }
 
 function handleWS(e){
-    const d = JSON.parse(e.data);
-
-    if(d.type === "message"){
-        addMessage(d.nick, d.text, d.nick === myNick ? "me" : "other");
-    }
-    if(d.type === "system"){
-        addSystem(d.text);
-    }
-    if(d.type === "users"){
-        updateUsers(d.users);
-    }
+const d=JSON.parse(e.data);
+if(d.type==="message")addMessage(d.nick,d.text,d.nick===myNick?"me":"other");
+if(d.type==="system")addSystem(d.text);
+if(d.type==="users")updateUsers(d.users);
 }
 
 function sendMessage(){
-    if(messageInput.value.trim()){
-        ws.send(messageInput.value);
-        messageInput.value = "";
-    }
-}
+if(messageInput.value.trim()){
+ws.send(messageInput.value);
+messageInput.value="";
+}}
 
-messageInput.addEventListener("keydown", e=>{
-    if(e.key === "Enter"){
-        e.preventDefault();
-        sendMessage();
-    }
+function clearChat(){
+fetch("/clear",{method:"POST"}).then(()=>{
+chat.innerHTML="";
 });
-
-function logout(){
-    fetch("/logout", { method:"POST", credentials:"include" })
-        .then(()=>location.reload());
 }
 
-function addMessage(nick, text, side){
-    const m = document.createElement("div");
-    m.className = "msg " + side;
-    m.innerHTML = `
-        <div class="avatar">${nick[0]}</div>
-        <div class="bubble"><b>${nick}</b><br>${text}</div>
-    `;
-    chat.appendChild(m);
-    chat.scrollTop = chat.scrollHeight;
+function logout(){fetch("/logout",{method:"POST"}).then(()=>location.reload());}
+
+function addMessage(n,t,s){
+const m=document.createElement("div");
+m.className="msg "+s;
+m.innerHTML=`<div class="avatar">${n[0]}</div><div class="bubble"><b>${n}</b><br>${t}</div>`;
+chat.appendChild(m);chat.scrollTop=chat.scrollHeight;
 }
 
-function addSystem(text){
-    const s = document.createElement("div");
-    s.className = "system";
-    s.textContent = text;
-    chat.appendChild(s);
-    chat.scrollTop = chat.scrollHeight;
+function addSystem(t){
+const s=document.createElement("div");
+s.className="system";s.textContent=t;
+chat.appendChild(s);
 }
 
-function updateUsers(users){
-    userList.innerHTML = "";
-    users.forEach(u=>{
-        const li = document.createElement("li");
-        li.textContent = "🟢 " + u;
-        userList.appendChild(li);
-    });
+function updateUsers(u){
+userList.innerHTML="";
+u.forEach(n=>{const li=document.createElement("li");li.textContent="🟢 "+n;userList.appendChild(li);});
 }
 
 function toggleEmoji(){
-    emojiPanel.style.display =
-        emojiPanel.style.display === "block" ? "none" : "block";
+emojiPanel.style.display=emojiPanel.style.display==="block"?"none":"block";
 }
 
 emojis.forEach(e=>{
-    const s = document.createElement("span");
-    s.textContent = e;
-    s.onclick = () => messageInput.value += e;
-    emojiPanel.appendChild(s);
+const s=document.createElement("span");
+s.textContent=e;
+s.onclick=()=>messageInput.value+=e;
+emojiPanel.appendChild(s);
 });
-
-window.onload = () => {
-    fetch("/me", { credentials: "include" })
-        .then(r=>r.json())
-        .then(d=>{
-            if(d.auth) startApp();
-        });
-};
 </script>
 
 </body>

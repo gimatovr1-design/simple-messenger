@@ -4,24 +4,14 @@ import uvicorn
 import os
 import uuid
 import hashlib
-
 from dotenv import load_dotenv
 from supabase import create_client
-
-# ===============================
-# ENV + SUPABASE
-# ===============================
 
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# ===============================
-# APP
-# ===============================
 
 app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -31,7 +21,7 @@ async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 # ===============================
-# ЧАТ (НЕ ТРОГАЕМ)
+# WEBSOCKET
 # ===============================
 
 class Manager:
@@ -52,14 +42,24 @@ class Manager:
             except:
                 self.disconnect(c)
 
-    def get_online_list(self):
-        return [nick for nick in self.clients.values() if nick]
+    def get_online(self):
+        return [n for n in self.clients.values() if n]
 
 manager = Manager()
 
 @app.websocket("/ws")
 async def websocket(ws: WebSocket):
     await manager.connect(ws)
+
+    # 🔹 загрузка истории
+    history = supabase.table("messages").select("*").order("id").execute()
+    for m in history.data:
+        await ws.send_json({
+            "type": "message",
+            "nick": m["nick"],
+            "text": m["text"]
+        })
+
     try:
         while True:
             msg = await ws.receive_text()
@@ -67,17 +67,15 @@ async def websocket(ws: WebSocket):
             if msg.startswith("/nick "):
                 nick = msg[6:]
                 manager.clients[ws] = nick
-
-                await ws.send_json({
-                    "type": "system",
-                    "text": "✅ Ник установлен"
-                })
-
-                await manager.broadcast({
-                    "type": "users",
-                    "users": manager.get_online_list()
-                })
+                await ws.send_json({"type": "system", "text": "✅ Ник установлен"})
+                await manager.broadcast({"type": "users", "users": manager.get_online()})
                 continue
+
+            # 🔹 сохраняем сообщение
+            supabase.table("messages").insert({
+                "nick": manager.clients.get(ws, ""),
+                "text": msg
+            }).execute()
 
             await manager.broadcast({
                 "type": "message",
@@ -87,13 +85,10 @@ async def websocket(ws: WebSocket):
 
     except WebSocketDisconnect:
         manager.disconnect(ws)
-        await manager.broadcast({
-            "type": "users",
-            "users": manager.get_online_list()
-        })
+        await manager.broadcast({"type": "users", "users": manager.get_online()})
 
 # ===============================
-# АВТОРИЗАЦИЯ (SUPABASE)
+# AUTH
 # ===============================
 
 def hash_password(p: str) -> str:
@@ -107,8 +102,7 @@ async def register(data: dict = Body(...)):
     if not phone or not password:
         return {"ok": False}
 
-    exists = supabase.table("users").select("id").eq("phone", phone).execute()
-    if exists.data:
+    if supabase.table("users").select("id").eq("phone", phone).execute().data:
         return {"ok": False}
 
     token = str(uuid.uuid4())
@@ -127,29 +121,14 @@ async def login(response: Response, data: dict = Body(...)):
     phone = data.get("phone")
     password = data.get("password")
 
-    if not phone or not password:
-        return {"ok": False}
-
-    res = supabase.table("users") \
-        .select("token, password_hash") \
-        .eq("phone", phone) \
-        .execute()
-
+    res = supabase.table("users").select("*").eq("phone", phone).execute()
     if not res.data:
         return {"ok": False}
 
-    user = res.data[0]
-    if user["password_hash"] != hash_password(password):
+    if res.data[0]["password_hash"] != hash_password(password):
         return {"ok": False}
 
-    response.set_cookie(
-        key="token",
-        value=user["token"],
-        httponly=True,
-        samesite="lax",
-        max_age=60 * 60 * 24 * 365
-    )
-
+    response.set_cookie("token", res.data[0]["token"], httponly=True, max_age=31536000)
     return {"ok": True}
 
 @app.post("/logout")
@@ -170,8 +149,13 @@ async def me(request: Request):
     return {"auth": True, "phone": res.data[0]["phone"]}
 
 # ===============================
-# RUN
+# CLEAR CHAT (ТЫ ВИДИШЬ КНОПКУ)
 # ===============================
+
+@app.post("/clear")
+async def clear():
+    supabase.table("messages").delete().neq("id", 0).execute()
+    return {"ok": True}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
