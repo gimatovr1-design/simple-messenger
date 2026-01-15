@@ -101,8 +101,8 @@ def hash_password(p: str) -> str:
 
 @app.post("/register")
 async def register(data: dict = Body(...)):
-    phone = data.get("phone")
-    password = data.get("password")
+    phone = data.get("phone", "").strip()
+    password = data.get("password", "").strip()
 
     if not phone or not password:
         return {"ok": False}
@@ -113,26 +113,25 @@ async def register(data: dict = Body(...)):
 
     token = str(uuid.uuid4())
 
-    # ✅ ВОТ ЕДИНСТВЕННОЕ ИСПРАВЛЕНИЕ
     supabase.table("users").insert({
         "phone": phone,
         "password_hash": hash_password(password),
         "token": token,
-        "nickname": phone   # 👈 было НЕТ → теперь ЕСТЬ
+        "nickname": phone
     }).execute()
 
     return {"ok": True}
 
 @app.post("/login")
 async def login(response: Response, data: dict = Body(...)):
-    phone = data.get("phone")
-    password = data.get("password")
+    phone = data.get("phone", "").strip()
+    password = data.get("password", "").strip()
 
     if not phone or not password:
         return {"ok": False}
 
     res = supabase.table("users") \
-        .select("token, password_hash") \
+        .select("token, password_hash, nickname") \
         .eq("phone", phone) \
         .execute()
 
@@ -140,6 +139,7 @@ async def login(response: Response, data: dict = Body(...)):
         return {"ok": False}
 
     user = res.data[0]
+
     if user["password_hash"] != hash_password(password):
         return {"ok": False}
 
@@ -151,7 +151,10 @@ async def login(response: Response, data: dict = Body(...)):
         max_age=60 * 60 * 24 * 365
     )
 
-    return {"ok": True}
+    return {
+        "ok": True,
+        "nickname": user["nickname"]
+    }
 
 @app.get("/me")
 async def me(request: Request):
@@ -159,11 +162,21 @@ async def me(request: Request):
     if not token:
         return {"auth": False}
 
-    res = supabase.table("users").select("phone").eq("token", token).execute()
+    res = supabase.table("users") \
+        .select("phone, nickname") \
+        .eq("token", token) \
+        .execute()
+
     if not res.data:
         return {"auth": False}
 
-    return {"auth": True, "phone": res.data[0]["phone"]}
+    user = res.data[0]
+
+    return {
+        "auth": True,
+        "nickname": user["nickname"],
+        "phone": user["phone"]
+    }
 
 # ===============================
 # RUN
