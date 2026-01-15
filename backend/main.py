@@ -105,11 +105,11 @@ async def register(data: dict = Body(...)):
     password = data.get("password")
 
     if not phone or not password:
-        return {"status": "error"}
+        return {"ok": False}
 
     exists = supabase.table("users").select("id").eq("phone", phone).execute()
     if exists.data:
-        return {"status": "error"}
+        return {"ok": False}
 
     token = str(uuid.uuid4())
 
@@ -119,18 +119,15 @@ async def register(data: dict = Body(...)):
         "token": token
     }).execute()
 
-    return {"status": "ok"}
+    return {"ok": True}
 
 @app.post("/login")
-async def login(
-    data: dict = Body(...),
-    response: Response = Response()
-):
+async def login(data: dict = Body(...), response: Response):
     phone = data.get("phone")
     password = data.get("password")
 
     if not phone or not password:
-        return {"status": "error"}
+        return {"ok": False}
 
     res = supabase.table("users") \
         .select("token, password_hash") \
@@ -138,11 +135,11 @@ async def login(
         .execute()
 
     if not res.data:
-        return {"status": "error"}
+        return {"ok": False}
 
     user = res.data[0]
     if user["password_hash"] != hash_password(password):
-        return {"status": "error"}
+        return {"ok": False}
 
     response.set_cookie(
         key="token",
@@ -152,7 +149,7 @@ async def login(
         max_age=60 * 60 * 24 * 365
     )
 
-    return {"status": "ok"}
+    return {"ok": True}
 
 @app.get("/me")
 async def me(request: Request):
