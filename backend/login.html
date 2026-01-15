@@ -25,9 +25,6 @@ input,button{
     padding:10px;
     margin-top:10px;
 }
-button{
-    cursor:pointer;
-}
 </style>
 </head>
 <body>
@@ -44,36 +41,32 @@ async function login(){
     const phone = document.getElementById("phone").value.trim();
     const password = document.getElementById("password").value.trim();
 
-    if (!phone || !password) {
+    if(!phone || !password){
         alert("Заполни номер и пароль");
         return;
     }
 
+    const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, password })
+    });
+
+    let data;
     try {
-        const res = await fetch("/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone, password })
-        });
+        data = await res.json();
+    } catch {
+        alert("Сервер вернул не JSON");
+        return;
+    }
 
-        // 🔥 ВАЖНО: читаем ТЕКСТ, а не JSON
-        const text = await res.text();
-        console.log("LOGIN RESPONSE:", text);
-
-        if (res.ok) {
-            localStorage.setItem("phone", phone);
-            window.location.href = "/private";
-        } else {
-            alert("Ошибка входа");
-        }
-
-    } catch (err) {
-        console.error("LOGIN ERROR:", err);
-        alert("Ошибка соединения с сервером");
+    if(data.ok){
+        window.location.href = "/";
+    } else {
+        alert("Неверный номер или пароль");
     }
 }
 </script>
 
 </body>
 </html>
-
