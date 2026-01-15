@@ -6,26 +6,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-/* === СТИЛИ БЕЗ ИЗМЕНЕНИЙ === */
+/* === БАЗА === */
 body {
     margin: 0;
     padding: 10px;
-    min-height: 100vh;
+    min-height: 100dvh;
     font-family: system-ui, sans-serif;
     color: #fff;
     background: linear-gradient(120deg,#7f00ff,#00c6ff,#ff0080);
+    font-size: clamp(14px, 2.5vw, 16px);
 }
 
+/* === АВТОЦЕНТРОВКА === */
+#loginBox,
+#nickBox,
+#chatApp {
+    max-width: 1000px;
+    margin: auto;
+}
+
+/* === LOGIN === */
 #loginBox {
     max-width: 320px;
-    margin: auto;
     background: rgba(0,0,0,.45);
     padding: 20px;
     border-radius: 12px;
 }
 
-.layout { display: flex; gap: 10px; }
+/* === LAYOUT === */
+.layout {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
 
+/* === USERS === */
 #users {
     width: 160px;
     background: rgba(0,0,0,.45);
@@ -33,18 +48,31 @@ body {
     border-radius: 8px;
 }
 
-.chatBox { flex: 1; }
+/* === CHAT === */
+.chatBox {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
 
 #chat {
-    height: 320px;
+    flex: 1;
+    min-height: 300px;
     overflow-y: auto;
     background: rgba(0,0,0,.45);
     border-radius: 8px;
     padding: 10px;
 }
 
-.msg { display: flex; margin-bottom: 8px; }
-.msg.me { flex-direction: row-reverse; }
+/* === MESSAGES === */
+.msg {
+    display: flex;
+    margin-bottom: 8px;
+}
+
+.msg.me {
+    flex-direction: row-reverse;
+}
 
 .avatar {
     width: 36px;
@@ -63,6 +91,7 @@ body {
     padding: 6px 10px;
     border-radius: 10px;
     background: rgba(0,255,255,.35);
+    word-break: break-word;
 }
 
 .msg.other .bubble {
@@ -76,12 +105,22 @@ body {
     margin: 6px 0;
 }
 
+/* === INPUT === */
 .inputBox {
     display: flex;
     gap: 6px;
     margin-top: 6px;
 }
 
+input,
+button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 6px;
+    font-size: 16px;
+}
+
+/* === EMOJI === */
 #emojiPanel {
     display: none;
     background: rgba(0,0,0,.5);
@@ -99,10 +138,29 @@ body {
     display: inline-block;
 }
 
-input, button {
-    width: 100%;
-    padding: 8px;
-    margin-top: 6px;
+/* === 📱 АДАПТИВНОСТЬ === */
+@media (max-width: 768px) {
+
+    .layout {
+        flex-direction: column;
+    }
+
+    #users {
+        width: 100%;
+        order: 2;
+    }
+
+    .chatBox {
+        order: 1;
+    }
+
+    .bubble {
+        max-width: 85%;
+    }
+
+    #chat {
+        min-height: 55dvh;
+    }
 }
 </style>
 </head>
@@ -250,7 +308,6 @@ function sendMessage(){
     }
 }
 
-/* ⏎ ОТПРАВКА ПО ENTER */
 messageInput.addEventListener("keydown", e=>{
     if(e.key === "Enter"){
         e.preventDefault();
