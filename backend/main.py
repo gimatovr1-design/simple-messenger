@@ -26,14 +26,6 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 🔥 ВОТ ЭТО ДОБАВЛЕНО (ЕДИНСТВЕННОЕ ИСПРАВЛЕНИЕ)
-@app.exception_handler(Exception)
-async def all_exception_handler(request: Request, exc: Exception):
-    return JSONResponse(
-        status_code=500,
-        content={"ok": False, "error": str(exc)}
-    )
-
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
@@ -113,11 +105,11 @@ async def register(data: dict = Body(...)):
     password = data.get("password")
 
     if not phone or not password:
-        return {"ok": False}
+        return JSONResponse({"ok": False})
 
     exists = supabase.table("users").select("id").eq("phone", phone).execute()
     if exists.data:
-        return {"ok": False}
+        return JSONResponse({"ok": False})
 
     token = str(uuid.uuid4())
 
@@ -127,15 +119,15 @@ async def register(data: dict = Body(...)):
         "token": token
     }).execute()
 
-    return {"ok": True}
+    return JSONResponse({"ok": True})
 
 @app.post("/login")
-async def login(response: Response, data: dict = Body(...)):
+async def login(data: dict = Body(...), response: Response = Response()):
     phone = data.get("phone")
     password = data.get("password")
 
     if not phone or not password:
-        return {"ok": False}
+        return JSONResponse({"ok": False})
 
     res = supabase.table("users") \
         .select("token, password_hash") \
@@ -143,11 +135,11 @@ async def login(response: Response, data: dict = Body(...)):
         .execute()
 
     if not res.data:
-        return {"ok": False}
+        return JSONResponse({"ok": False})
 
     user = res.data[0]
     if user["password_hash"] != hash_password(password):
-        return {"ok": False}
+        return JSONResponse({"ok": False})
 
     response.set_cookie(
         key="token",
@@ -157,19 +149,19 @@ async def login(response: Response, data: dict = Body(...)):
         max_age=60 * 60 * 24 * 365
     )
 
-    return {"ok": True}
+    return JSONResponse({"ok": True})
 
 @app.get("/me")
 async def me(request: Request):
     token = request.cookies.get("token")
     if not token:
-        return {"auth": False}
+        return JSONResponse({"auth": False})
 
     res = supabase.table("users").select("phone").eq("token", token).execute()
     if not res.data:
-        return {"auth": False}
+        return JSONResponse({"auth": False})
 
-    return {"auth": True, "phone": res.data[0]["phone"]}
+    return JSONResponse({"auth": True, "phone": res.data[0]["phone"]})
 
 # ===============================
 # RUN
