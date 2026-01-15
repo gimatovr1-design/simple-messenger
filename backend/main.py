@@ -9,16 +9,12 @@ import hashlib
 app = FastAPI()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# ===============================
-# СТРАНИЦА
-# ===============================
-
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 # ===============================
-# ЧАТ (СТАБИЛЬНЫЙ)
+# ЧАТ
 # ===============================
 
 class Manager:
@@ -68,7 +64,7 @@ async def websocket(ws: WebSocket):
 
                 await manager.broadcast({
                     "type": "users",
-                    "list": manager.get_online_list()
+                    "users": manager.get_online_list()   # 🔥 ВАЖНО
                 })
                 continue
 
@@ -89,7 +85,7 @@ async def websocket(ws: WebSocket):
 
             await manager.broadcast({
                 "type": "users",
-                "list": manager.get_online_list()
+                "users": manager.get_online_list()   # 🔥 ВАЖНО
             })
 
         manager.disconnect(ws)
@@ -160,10 +156,6 @@ async def login(data: dict = Body(...), response: Response = None):
     )
 
     return {"status": "ok"}
-
-# ===============================
-# ЗАПУСК
-# ===============================
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
